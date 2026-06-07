@@ -23,16 +23,20 @@
  *   Range requests (for audio streaming) are forwarded transparently.
  */
 
-const { execFileSync } = require("child_process");
-try {
-  execFileSync("yt-dlp", ["-U"], { stdio: "inherit" });
-} catch (e) {
-  console.warn("yt-dlp self-update failed:", e.message);
-}
 const http        = require("http");
 const https       = require("https");
 const { URL }     = require("url");
 const { execFile } = require("child_process");
+const fs          = require("fs");
+
+// Write YouTube cookies to a temp file if provided via environment variable
+const COOKIES_FILE = "/tmp/yt-cookies.txt";
+if (process.env.YOUTUBE_COOKIES) {
+  fs.writeFileSync(COOKIES_FILE, process.env.YOUTUBE_COOKIES);
+  console.log("[cookies] YouTube cookies loaded from environment");
+} else {
+  console.warn("[cookies] No YOUTUBE_COOKIES env var set — bot detection may block streams");
+}
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
 
@@ -91,10 +95,20 @@ function resolveViaYtDlp(videoId) {
   // Spawn yt-dlp
   const promise = new Promise((resolve, reject) => {
     const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const args = [
+      "--no-playlist",
+      "-f", "bestaudio",
+      "--no-warnings",
+      "--get-url",
+    ];
+    if (fs.existsSync(COOKIES_FILE)) {
+      args.push("--cookies", COOKIES_FILE);
+    }
+    args.push(ytUrl);
     execFile(
       "yt-dlp",
-      ["--no-playlist", "-f", "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio", "--get-url", ytUrl],
-      { timeout: 20000 },
+      args,
+      { timeout: 30000 },
       (err, stdout, stderr) => {
         streamInFlight.delete(videoId);
         if (err) { reject({ err, stderr }); return; }
