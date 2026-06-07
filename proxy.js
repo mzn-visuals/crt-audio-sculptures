@@ -23,6 +23,12 @@
  *   Range requests (for audio streaming) are forwarded transparently.
  */
 
+const { execFileSync } = require("child_process");
+try {
+  execFileSync("yt-dlp", ["-U"], { stdio: "inherit" });
+} catch (e) {
+  console.warn("yt-dlp self-update failed:", e.message);
+}
 const http        = require("http");
 const https       = require("https");
 const { URL }     = require("url");
@@ -87,7 +93,7 @@ function resolveViaYtDlp(videoId) {
     const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
     execFile(
       "yt-dlp",
-      ["--no-playlist", "-f", "bestaudio", "--no-warnings", "--get-url", ytUrl],
+      ["--no-playlist", "-f", "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio", "--get-url", ytUrl],
       { timeout: 20000 },
       (err, stdout, stderr) => {
         streamInFlight.delete(videoId);
