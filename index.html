@@ -1487,6 +1487,51 @@
           setStatus("ready", false);
         }, { once: true });
 
+        // Recovery: if the stream URL expires mid-playback, re-resolve and resume
+        let recovering = false;
+        async function recoverStream() {
+          if (recovering) return;
+          // Only recover if this track is still active
+          if (!el.classList.contains("active")) return;
+          recovering = true;
+          const resumeAt = audioEl.currentTime;
+          statusEl.className = "sStatus loading";
+          statusEl.textContent = "↻";
+          setStatus("reconnecting…", false);
+          try {
+            // Bust proxy cache so we get a fresh URL from yt-dlp
+            if (await proxyAlive()) {
+              await fetch(`${LOCAL_PROXY}/refresh/${track.id}`).catch(() => {});
+            }
+            const freshUrl = await resolveAudioUrl(track.id);
+            audioEl.src = freshUrl;
+            audioEl.load();
+            audioEl.currentTime = resumeAt;
+            if (audioCtx.state === "suspended") await audioCtx.resume();
+            await audioEl.play();
+            statusEl.className = "sStatus ok";
+            statusEl.textContent = "▶";
+            setStatus("streaming", true);
+          } catch(e) {
+            console.warn("Stream recovery failed:", e);
+            statusEl.className = "sStatus err";
+            statusEl.textContent = "✕";
+            el.classList.remove("active");
+            setStatus("stream lost", false);
+          }
+          recovering = false;
+        }
+
+        audioEl.addEventListener("error", (e) => {
+          // MediaError code 4 = MEDIA_ERR_SRC_NOT_SUPPORTED (expired URL)
+          // code 2 = MEDIA_ERR_NETWORK (connection dropped)
+          const code = audioEl.error?.code;
+          if (el.classList.contains("active") && (code === 2 || code === 4)) {
+            console.info("[Stream] error code", code, "— attempting recovery");
+            recoverStream();
+          }
+        });
+
       } catch(e){
         console.warn("Stream failed:", e);
         statusEl.className = "sStatus err";

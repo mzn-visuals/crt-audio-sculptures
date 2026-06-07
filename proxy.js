@@ -140,7 +140,19 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ---- /ping — liveness check used by the HTML to detect the proxy ----
+  // ---- /refresh/:videoId — bust cache and re-resolve immediately ----
+  // Called when the HTML detects a mid-playback stream error
+  const refreshMatch = req.url.match(/^\/refresh\/([A-Za-z0-9_-]{11})(\?.*)?$/);
+  if (refreshMatch) {
+    sendCors(res, 200, { "Content-Type": "application/json" });
+    const videoId = refreshMatch[1];
+    streamCache.delete(videoId); // force fresh yt-dlp call
+    res.end(JSON.stringify({ status: "refreshing" }));
+    resolveViaYtDlp(videoId)
+      .then(() => console.info(`[refresh] ready ${videoId}`))
+      .catch(() => console.info(`[refresh] failed ${videoId}`));
+    return;
+  }
   if (req.url === "/ping" || req.url === "/ping?") {
     sendCors(res, 200, { "Content-Type": "text/plain" });
     res.end("pong");
