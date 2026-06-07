@@ -27,16 +27,6 @@ const http        = require("http");
 const https       = require("https");
 const { URL }     = require("url");
 const { execFile } = require("child_process");
-const fs          = require("fs");
-
-// Write YouTube cookies to a temp file if provided via environment variable
-const COOKIES_FILE = "/tmp/yt-cookies.txt";
-if (process.env.YOUTUBE_COOKIES_B64) {
-  const decoded = Buffer.from(process.env.YOUTUBE_COOKIES_B64, 'base64').toString('utf8');
-  fs.writeFileSync(COOKIES_FILE, decoded);
-} else if (process.env.YOUTUBE_COOKIES) {
-  fs.writeFileSync(COOKIES_FILE, process.env.YOUTUBE_COOKIES);
-}
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
 
@@ -95,20 +85,10 @@ function resolveViaYtDlp(videoId) {
   // Spawn yt-dlp
   const promise = new Promise((resolve, reject) => {
     const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const args = [
-      "--no-playlist",
-      "-f", "bestaudio",
-      "--no-warnings",
-      "--get-url",
-    ];
-    if (fs.existsSync(COOKIES_FILE)) {
-      args.push("--cookies", COOKIES_FILE);
-    }
-    args.push(ytUrl);
     execFile(
       "yt-dlp",
-      args,
-      { timeout: 30000 },
+      ["--no-playlist", "-f", "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio", "--get-url", ytUrl],
+      { timeout: 20000 },
       (err, stdout, stderr) => {
         streamInFlight.delete(videoId);
         if (err) { reject({ err, stderr }); return; }
@@ -160,19 +140,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ---- /refresh/:videoId — bust cache and re-resolve immediately ----
-  // Called when the HTML detects a mid-playback stream error
-  const refreshMatch = req.url.match(/^\/refresh\/([A-Za-z0-9_-]{11})(\?.*)?$/);
-  if (refreshMatch) {
-    sendCors(res, 200, { "Content-Type": "application/json" });
-    const videoId = refreshMatch[1];
-    streamCache.delete(videoId); // force fresh yt-dlp call
-    res.end(JSON.stringify({ status: "refreshing" }));
-    resolveViaYtDlp(videoId)
-      .then(() => console.info(`[refresh] ready ${videoId}`))
-      .catch(() => console.info(`[refresh] failed ${videoId}`));
-    return;
-  }
+  // ---- /ping — liveness check used by the HTML to detect the proxy ----
   if (req.url === "/ping" || req.url === "/ping?") {
     sendCors(res, 200, { "Content-Type": "text/plain" });
     res.end("pong");
@@ -265,7 +233,7 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, "0.0.0.0", () => {
+server.listen(PORT, "127.0.0.1", () => {
   console.log(`\nCRT Audio Sculptures — local proxy running`);
   console.log(`  http://localhost:${PORT}`);
   console.log(`\nKeep this terminal open while using the app.`);
