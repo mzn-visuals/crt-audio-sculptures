@@ -31,11 +31,11 @@ const fs          = require("fs");
 
 // Write YouTube cookies to a temp file if provided via environment variable
 const COOKIES_FILE = "/tmp/yt-cookies.txt";
-if (process.env.YOUTUBE_COOKIES) {
+if (process.env.YOUTUBE_COOKIES_B64) {
+  const decoded = Buffer.from(process.env.YOUTUBE_COOKIES_B64, 'base64').toString('utf8');
+  fs.writeFileSync(COOKIES_FILE, decoded);
+} else if (process.env.YOUTUBE_COOKIES) {
   fs.writeFileSync(COOKIES_FILE, process.env.YOUTUBE_COOKIES);
-  console.log("[cookies] YouTube cookies loaded from environment");
-} else {
-  console.warn("[cookies] No YOUTUBE_COOKIES env var set — bot detection may block streams");
 }
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
