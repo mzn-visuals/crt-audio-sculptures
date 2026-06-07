@@ -23,6 +23,16 @@
  *   Range requests (for audio streaming) are forwarded transparently.
  */
 
+const fs = require('fs');
+
+// Debug: check cookies file
+const cookiesPath = '/etc/secrets/cookies.txt';
+if (fs.existsSync(cookiesPath)) {
+  const content = fs.readFileSync(cookiesPath, 'utf8');
+  console.log('[cookies] file found, first line:', content.split('\n')[0]);
+} else {
+  console.log('[cookies] FILE NOT FOUND at', cookiesPath);
+}
 const http        = require("http");
 const https       = require("https");
 const { URL }     = require("url");
