@@ -93,7 +93,7 @@ function resolveViaYtDlp(videoId) {
     return streamInFlight.get(videoId);
   }
   // Spawn yt-dlp
-  const promise = new Promise((resolve, reject) => {
+const promise = new Promise((resolve, reject) => {
     const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
     execFile(
     "yt-dlp",
@@ -101,7 +101,12 @@ function resolveViaYtDlp(videoId) {
     { timeout: 20000 },
       (err, stdout, stderr) => {
         streamInFlight.delete(videoId);
-        if (err) { reject({ err, stderr }); return; }
+        if (err) { 
+          console.error(`[yt-dlp stderr for ${videoId}]`, stderr);
+          console.error(`[yt-dlp err for ${videoId}]`, err.message);
+          reject({ err, stderr }); 
+          return; 
+        }
         const audioUrl = stdout.trim().split("\n")[0];
         if (!audioUrl) { reject({ err: new Error("yt-dlp returned no URL") }); return; }
         streamCache.set(videoId, { url: audioUrl, expires: Date.now() + CACHE_TTL_MS });
