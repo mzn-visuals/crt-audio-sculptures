@@ -87,7 +87,7 @@ function resolveViaYtDlp(videoId) {
     const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
     execFile(
       "yt-dlp",
-      ["--no-playlist", "-f", "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio", "--get-url", ytUrl],
+      ["--no-playlist", "-f", "bestaudio", "--no-warnings", "--get-url", ytUrl],
       { timeout: 20000 },
       (err, stdout, stderr) => {
         streamInFlight.delete(videoId);
