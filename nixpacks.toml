@@ -1,8 +1,0 @@
-[phases.setup]
-nixPkgs = ["nodejs_20", "python3", "python3Packages.pip"]
-
-[phases.install]
-cmds = ["pip install --upgrade yt-dlp --break-system-packages", "npm install"]
-
-[start]
-cmd = "PATH=$PATH:/root/.local/bin node proxy.js"
