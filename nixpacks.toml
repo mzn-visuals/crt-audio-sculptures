@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "python3", "pip"]
+nixPkgs = ["nodejs_20", "python3"]
 
 [phases.install]
 cmds = ["pip install --upgrade yt-dlp", "npm install"]
