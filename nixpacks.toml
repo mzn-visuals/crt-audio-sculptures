@@ -1,5 +1,8 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "python3Packages.yt-dlp"]
+nixPkgs = ["nodejs_20", "python3"]
+
+[phases.install]
+cmds = ["python3 -m ensurepip --upgrade && python3 -m pip install --upgrade yt-dlp", "npm install"]
 
 [start]
 cmd = "node proxy.js"
