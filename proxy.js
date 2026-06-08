@@ -85,8 +85,9 @@ function resolveViaYtDlp(videoId) {
   // Spawn yt-dlp
   const promise = new Promise((resolve, reject) => {
     const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const ytDlp = process.env.YT_DLP_PATH || "yt-dlp";
     execFile(
-      "yt-dlp",
+      ytDlp,
       ["--no-playlist", "-f", "bestaudio", "--get-url", "--extractor-args", "youtube:player_client=tv_embedded", ytUrl],
       { timeout: 20000 },
       (err, stdout, stderr) => {
