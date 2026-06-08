@@ -23,16 +23,6 @@
  *   Range requests (for audio streaming) are forwarded transparently.
  */
 
-const fs = require('fs');
-
-// Debug: check cookies file
-const cookiesPath = '/etc/secrets/cookies.txt';
-if (fs.existsSync(cookiesPath)) {
-  const content = fs.readFileSync(cookiesPath, 'utf8');
-  console.log('[cookies] file found, first line:', content.split('\n')[0]);
-} else {
-  console.log('[cookies] FILE NOT FOUND at', cookiesPath);
-}
 const http        = require("http");
 const https       = require("https");
 const { URL }     = require("url");
@@ -93,19 +83,19 @@ function resolveViaYtDlp(videoId) {
     return streamInFlight.get(videoId);
   }
   // Spawn yt-dlp
-const promise = new Promise((resolve, reject) => {
+  const promise = new Promise((resolve, reject) => {
     const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
     execFile(
-    "yt-dlp",
-    ["--cookies", "/etc/secrets/cookies.txt", "--no-playlist", "-f", "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio", "--get-url", ytUrl],
-    { timeout: 20000 },
+      "yt-dlp",
+      ["--no-playlist", "-f", "bestaudio", "--get-url", "--extractor-args", "youtube:player_client=tv_embedded", ytUrl],
+      { timeout: 20000 },
       (err, stdout, stderr) => {
         streamInFlight.delete(videoId);
-        if (err) { 
+        if (err) {
           console.error(`[yt-dlp stderr for ${videoId}]`, stderr);
           console.error(`[yt-dlp err for ${videoId}]`, err.message);
-          reject({ err, stderr }); 
-          return; 
+          reject({ err, stderr });
+          return;
         }
         const audioUrl = stdout.trim().split("\n")[0];
         if (!audioUrl) { reject({ err: new Error("yt-dlp returned no URL") }); return; }
@@ -120,7 +110,6 @@ const promise = new Promise((resolve, reject) => {
 
 const server = http.createServer((req, res) => {
   // ---- /stream/:videoId — resolve audio URL via yt-dlp (cached) ----
-  // Returns JSON: { url: "https://..." } or { error: "..." }
   const streamMatch = req.url.match(/^\/stream\/([A-Za-z0-9_-]{11})(\?.*)?$/);
   if (streamMatch) {
     sendCors(res, 200, { "Content-Type": "application/json" });
@@ -138,7 +127,6 @@ const server = http.createServer((req, res) => {
   }
 
   // ---- /prewarm/:videoId — fire-and-forget, returns immediately ----
-  // Called on hover so yt-dlp runs before the user clicks
   const prewarmMatch = req.url.match(/^\/prewarm\/([A-Za-z0-9_-]{11})(\?.*)?$/);
   if (prewarmMatch) {
     sendCors(res, 200, { "Content-Type": "application/json" });
@@ -155,7 +143,20 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ---- /ping — liveness check used by the HTML to detect the proxy ----
+  // ---- /refresh/:videoId — bust cache and re-resolve ----
+  const refreshMatch = req.url.match(/^\/refresh\/([A-Za-z0-9_-]{11})(\?.*)?$/);
+  if (refreshMatch) {
+    sendCors(res, 200, { "Content-Type": "application/json" });
+    const videoId = refreshMatch[1];
+    streamCache.delete(videoId);
+    res.end(JSON.stringify({ status: "refreshing" }));
+    resolveViaYtDlp(videoId)
+      .then(() => console.info(`[refresh] ready ${videoId}`))
+      .catch(() => console.info(`[refresh] failed ${videoId}`));
+    return;
+  }
+
+  // ---- /ping — liveness check ----
   if (req.url === "/ping" || req.url === "/ping?") {
     sendCors(res, 200, { "Content-Type": "text/plain" });
     res.end("pong");
@@ -181,7 +182,6 @@ const server = http.createServer((req, res) => {
 
   const host = parsedUrl.searchParams.get("__host");
   if (!host) {
-    // No __host = direct browser navigation to the proxy — just explain
     res.writeHead(200, { "Content-Type": "text/plain" });
     res.end(
       "CRT Audio Sculptures local proxy is running.\n" +
@@ -190,11 +190,9 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Rebuild the target URL
   parsedUrl.searchParams.delete("__host");
   const targetUrl = new URL(`https://${host}${parsedUrl.pathname}${parsedUrl.search}`);
 
-  // Build forwarded headers
   const fwdHeaders = {
     "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "host": host,
@@ -205,28 +203,19 @@ const server = http.createServer((req, res) => {
     }
   }
 
-  // Collect request body
   const bodyChunks = [];
   req.on("data", chunk => bodyChunks.push(chunk));
   req.on("end", () => {
     const body = bodyChunks.length ? Buffer.concat(bodyChunks) : null;
     if (body && body.length) fwdHeaders["content-length"] = String(body.length);
 
-    const options = {
-      method:   req.method,
-      headers:  fwdHeaders,
-    };
-
-    // Make the upstream request
-    const upReq = https.request(targetUrl.toString(), options, upRes => {
-      // Build response headers
+    const upReq = https.request(targetUrl.toString(), { method: req.method, headers: fwdHeaders }, upRes => {
       const outHeaders = { ...CORS_HEADERS };
       for (const [k, v] of Object.entries(upRes.headers)) {
         if (FORWARD_TO_BROWSER.has(k.toLowerCase())) {
           outHeaders[k] = v;
         }
       }
-
       res.writeHead(upRes.statusCode, outHeaders);
       upRes.pipe(res);
     });
