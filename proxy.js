@@ -23,16 +23,6 @@
  *   Range requests (for audio streaming) are forwarded transparently.
  */
 
-const fs = require('fs');
-
-// Debug: check cookies file
-const cookiesPath = '/etc/secrets/cookies.txt';
-if (fs.existsSync(cookiesPath)) {
-  const content = fs.readFileSync(cookiesPath, 'utf8');
-  console.log('[cookies] file found, first line:', content.split('\n')[0]);
-} else {
-  console.log('[cookies] FILE NOT FOUND at', cookiesPath);
-}
 const http        = require("http");
 const https       = require("https");
 const { URL }     = require("url");
@@ -97,7 +87,7 @@ const promise = new Promise((resolve, reject) => {
     const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
     execFile(
     "yt-dlp",
-    ["--cookies", "/etc/secrets/cookies.txt", "--no-playlist", "-f", "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio", "--get-url", ytUrl],
+    ["--no-playlist", "-f", "bestaudio", "--get-url", "--extractor-args", "youtube:player_client=ios", ytUrl],
     { timeout: 20000 },
       (err, stdout, stderr) => {
         streamInFlight.delete(videoId);
