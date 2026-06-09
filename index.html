@@ -1323,7 +1323,7 @@
         console.info("[Search] using local proxy");
         return await innertubeSearchViaProxy(query);
       }
-      throw new Error("proxy unavailable");
+      throw new Error("try reloading the page");
     }
 
     async function getAudioUrlViaProxy(videoId) {
@@ -1345,7 +1345,7 @@
         console.info("[Stream] using local proxy");
         return await getAudioUrlViaProxy(videoId);
       }
-      throw new Error("proxy unavailable");
+      throw new Error("try reloading the page");
     }
 
     const searchInput      = document.getElementById("searchInput");
