@@ -11,7 +11,7 @@ Built by [mzn.visuals](https://www.tiktok.com/@mzn.visuals).
 - 3D WebGL scene powered by Three.js
 - Bloom, afterimage, and CRT scanline post-processing
 - Audio-reactive geometry that moves with the beat
-- Synced lyrics floating in 3D space (auto-fetched from lrclib.net)
+- Synced lyrics floating in 3D space
 - Album art colors that bleed into the whole scene
 
 ---
@@ -66,7 +66,7 @@ Then open `index.html` in your browser. The app detects the proxy automatically.
 ```
 crt-audio-sculptures/
 ├── index.html    — the entire app
-└── proxy.js      — local CORS proxy (optional but recommended)
+└── proxy.js      — local CORS proxy
 ```
 
 ---
