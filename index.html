@@ -199,11 +199,13 @@
     #hudBody{
       padding: 10px 12px 12px;
       display:flex;
-      flex-wrap: wrap;
-      align-items: flex-end;
+      flex-direction: column;
+      align-items: stretch;
       gap: 10px;
-      max-height: 42vh;
-      overflow: auto;
+      max-height: min(42vh, calc(100dvh - 140px));
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     .group{
@@ -236,10 +238,82 @@
       outline: none;
     }
 
+    select{
+      color-scheme: dark;
+      background-color: rgba(8, 10, 18, .95);
+      cursor: pointer;
+    }
+    select option,
+    select optgroup{
+      background: #0c0e18;
+      color: rgba(255,255,255,.92);
+    }
+    select option:checked,
+    select option:hover,
+    select option:focus{
+      background: #1a2848;
+      color: #fff;
+    }
+
+    /* collapsible HUD sections */
+    details.group{
+      display: block;
+    }
+    details.group > summary.groupSummary{
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      width: 100%;
+      margin: 0 0 10px;
+      padding: 0 0 8px;
+      border-bottom: 1px solid rgba(255,255,255,.10);
+      font-size: 11px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      color: rgba(255,255,255,.86);
+      letter-spacing: .35px;
+      cursor: pointer;
+      user-select: none;
+    }
+    details.group:not([open]) > summary.groupSummary{
+      margin-bottom: 0;
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    details.group > summary.groupSummary::-webkit-details-marker{ display: none; }
+    details.group > summary.groupSummary::after{
+      content: "▼";
+      font-size: 9px;
+      opacity: .55;
+      transition: transform .15s ease;
+      flex: 0 0 auto;
+    }
+    details.group:not([open]) > summary.groupSummary::after{
+      transform: rotate(-90deg);
+    }
+    details.group .groupContent{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: flex-end;
+      width: 100%;
+    }
+
     input[type="file"]{
       padding: 9px 10px;
       border: 1px dashed rgba(255,255,255,.18);
       background: rgba(255,255,255,.05);
+    }
+    input[type="file"]::file-selector-button{
+      font: inherit;
+      color: var(--text);
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 8px;
+      padding: 6px 10px;
+      margin-right: 8px;
+      cursor: pointer;
     }
 
     input[type="color"]{
@@ -283,11 +357,34 @@
     #hud.min { width: min(560px, calc(100vw - 28px)); }
 
     @media (max-width: 560px){
-      #crtFrame{ inset: 10px; }
-      .group{ width: 100%; }
+      #crtFrame{ inset: 8px; }
+      #hud{
+        left: max(8px, env(safe-area-inset-left, 0px));
+        right: max(8px, env(safe-area-inset-right, 0px));
+        width: auto;
+        max-width: none;
+        transform: none;
+        bottom: max(8px, env(safe-area-inset-bottom, 8px));
+      }
+      #hud.min{
+        left: max(8px, env(safe-area-inset-left, 0px));
+        right: max(8px, env(safe-area-inset-right, 0px));
+        width: auto;
+      }
+      #hudTop{ padding: 8px 10px; gap: 8px; }
+      #hudTop .left{ min-width: 0; flex: 1; }
+      #hudTop b{ font-size: 11px; }
+      #hudToggle{ min-width: 72px; padding: 7px 8px; font-size: 10px; }
+      #hudBody{
+        padding: 8px 10px 10px;
+        max-height: min(58vh, calc(100dvh - 88px));
+        gap: 8px;
+      }
+      .group{ width: 100%; padding: 8px; }
       label{ min-width: 100%; }
       .rowBtns{ flex-direction: column; }
-      .pill{ max-width: calc(100vw - 150px); }
+      .pill{ max-width: 100%; font-size: 10px; }
+      details.group > summary.groupSummary{ font-size: 10px; }
     }
 
     /* ============================================================
@@ -319,7 +416,7 @@
       text-align: center;
       will-change: transform;
       contain: layout style;
-      --lyric-sz: 72px;
+      --lyric-sz: 16px;
       --lyric-scale-x: 1;
       --lyric-scale-y: 1;
       --lyric-opacity: 0.85;
@@ -650,7 +747,9 @@
     </div>
 
     <div id="hudBody">
-      <div class="group" style="min-width:min(560px,100%);">
+      <details class="group collapsible" open data-section="playback">
+        <summary class="groupSummary">Playback &amp; Search</summary>
+        <div class="groupContent" style="min-width:min(560px,100%);">
 
         <!-- Stream search -->
         <div id="searchBox">
@@ -689,15 +788,18 @@
         </div>
 
         <div class="hint">
-          Search streams via YouTube. Runs fastest with <b>proxy.js</b> running locally — falls back to Piped automatically. Some tracks may be unavailable. Press <b>M</b> to minimize/expand.
+          Search streams via YouTube. Some tracks may be unavailable. Press <b>M</b> to minimize/expand.
         </div>
-      </div>
+        </div>
+      </details>
 
-      <div class="group">
+      <details class="group collapsible" open data-section="shape">
+        <summary class="groupSummary">Shape &amp; Style</summary>
+        <div class="groupContent">
         <label>
           Shape
           <select id="shape">
-            <option value="sphere" selected>Sphere</option>
+            <option value="sphere">Sphere</option>
             <option value="ico">Icosa</option>
             <option value="dodeca">Dodeca</option>
             <option value="tetra">Tetra</option>
@@ -708,14 +810,14 @@
             <option value="knot">Knot</option>
             <option value="capsule">Capsule</option>
             <option value="cone">Cone</option>
-            <option value="cover">Cover Art</option>
+            <option value="cover" selected>Cover Art</option>
           </select>
         </label>
 
         <label>
           Style (deform)
           <select id="deformMode">
-            <option value="liquid" selected>Liquid</option>
+            <option value="liquid">Liquid</option>
             <option value="ripple">Ripple</option>
             <option value="aurora">Aurora Bands</option>
             <option value="halo">Halo Pulse</option>
@@ -726,7 +828,7 @@
             <option value="vortex">Vortex</option>
             <option value="crinkle">Crinkle</option>
             <option value="chatter">Chatter</option>
-            <option value="breath">Breath</option>
+            <option value="breath" selected>Breath</option>
           </select>
         </label>
 
@@ -735,8 +837,8 @@
           <select id="detail">
             <option value="3">Low</option>
             <option value="4">Medium</option>
-            <option value="5" selected>High</option>
-            <option value="6">Ultra</option>
+            <option value="5">High</option>
+            <option value="6" selected>Ultra</option>
           </select>
         </label>
 
@@ -744,9 +846,12 @@
           <input id="wireframe" type="checkbox" />
           <span style="color:var(--muted);font-size:11px">Wireframe</span>
         </label>
-      </div>
+        </div>
+      </details>
 
-      <div class="group">
+      <details class="group collapsible" data-section="colors">
+        <summary class="groupSummary">Colors</summary>
+        <div class="groupContent">
         <label>
           Sculpture color
           <input id="sculptColor" type="color" value="#cdb4ff" />
@@ -766,63 +871,69 @@
             <span id="colorAdaptText">color adapt</span>
           </span>
         </div>
-      </div>
+        </div>
+      </details>
 
-      <div class="group">
+      <details class="group collapsible" data-section="reactivity">
+        <summary class="groupSummary">Audio Reactivity</summary>
+        <div class="groupContent">
         <label>
           Sensitivity <span id="sensV" style="color:rgba(255,255,255,.75)"></span>
-          <input id="sensitivity" type="range" min="0.6" max="4.0" step="0.05" value="1.35" />
+          <input id="sensitivity" type="range" min="0.6" max="4.0" step="0.05" value="1.40" />
         </label>
 
         <label>
           Smoothing <span id="smoothV" style="color:rgba(255,255,255,.75)"></span>
-          <input id="smoothing" type="range" min="0" max="0.95" step="0.01" value="0.88" />
+          <input id="smoothing" type="range" min="0" max="0.95" step="0.01" value="0.50" />
         </label>
 
         <label>
           Displacement
-          <input id="displacement" type="range" min="0" max="2.5" step="0.01" value="0.85" />
+          <input id="displacement" type="range" min="0" max="2.5" step="0.01" value="1.25" />
         </label>
 
         <label>
           Rotation speed
-          <input id="rotSpeed" type="range" min="0" max="1.6" step="0.01" value="0.18" />
+          <input id="rotSpeed" type="range" min="0" max="1.6" step="0.01" value="1.20" />
         </label>
-      </div>
+        </div>
+      </details>
 
-      <div class="group">
+      <details class="group collapsible" data-section="effects">
+        <summary class="groupSummary">Effects &amp; CRT</summary>
+        <div class="groupContent">
         <label>
           Particles
-          <input id="particles" type="range" min="0" max="1" step="0.01" value="0.55" />
+          <input id="particles" type="range" min="0" max="1" step="0.01" value="1.00" />
         </label>
 
         <label>
           Bloom (capped)
-          <input id="bloomAmt" type="range" min="0" max="1.7" step="0.01" value="0.45" />
+          <input id="bloomAmt" type="range" min="0" max="1.7" step="0.01" value="0.595" />
         </label>
 
         <label>
           Motion blur (trails)
-          <input id="motionBlur" type="range" min="0" max="0.98" step="0.01" value="0.12" />
+          <input id="motionBlur" type="range" min="0" max="0.98" step="0.01" value="0" />
         </label>
 
         <label>
           CRT intensity
-          <input id="crtIntensity" type="range" min="0" max="1" step="0.01" value="0.78" />
+          <input id="crtIntensity" type="range" min="0" max="1" step="0.01" value="0" />
         </label>
 
         <label>
           Roundness X
-          <input id="roundX" type="range" min="0.02" max="0.36" step="0.001" value="0.22" />
+          <input id="roundX" type="range" min="0" max="0.36" step="0.001" value="0" />
         </label>
 
         <label>
           Roundness Y
-          <input id="roundY" type="range" min="0.02" max="0.36" step="0.001" value="0.22" />
+          <input id="roundY" type="range" min="0" max="0.36" step="0.001" value="0" />
         </label>
 
         <label style="flex-direction:row;align-items:center;gap:10px;min-width:180px">
-          <input id="crtJitter" type="checkbox" checked />
+          <input id="crtJitter" type="checkbox" />
           <span style="color:var(--muted);font-size:11px">V-Hold jitter</span>
         </label>
 
@@ -830,10 +941,13 @@
           <button id="randomize" type="button">Randomize</button>
           <button id="reset" class="secondary" type="button">Reset</button>
         </div>
-      </div>
+        </div>
+      </details>
 
       <!-- ======== LYRICS PANEL ======== -->
-      <div class="group" id="lyricsGroup" style="min-width:min(100%,640px);">
+      <details class="group collapsible" id="lyricsGroup" data-section="lyrics" style="min-width:min(100%,640px);">
+        <summary class="groupSummary">Lyrics</summary>
+        <div class="groupContent">
 
         <!-- header row -->
         <div style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
@@ -870,8 +984,8 @@
 
         <!-- size & stretch -->
         <label>
-          Font size <span id="lyricsSizeV" style="color:rgba(255,255,255,.75)">72</span>px
-          <input id="lyricsSize" type="range" min="18" max="180" step="1" value="72" />
+          Font size <span id="lyricsSizeV" style="color:rgba(255,255,255,.75)">16</span>px
+          <input id="lyricsSize" type="range" min="12" max="180" step="1" value="16" />
         </label>
         <label>
           Stretch X <span id="lyricsScaleXV" style="color:rgba(255,255,255,.75)">1.00</span>
@@ -890,7 +1004,8 @@
         <div class="hint">
           Synced LRC only. Sources (tried in order): <b>lrclib.net</b> → <b>Netease</b> → <b>QQ Music</b> (via Meting API). Auto-fetch on file load from <code>Artist - Title.mp3</code>. For best results, open this page through a local server (<code>npx serve</code>) instead of double-clicking the HTML file.
         </div>
-      </div>
+        </div>
+      </details>
     </div>
   </div>
 
@@ -979,10 +1094,18 @@
       setMinimized(!hud.classList.contains("min"));
     });
 
-    // cursor tilt (clamped so it never flips)
+    const isMobileHud = () => window.matchMedia("(max-width: 560px)").matches;
+
+    // cursor tilt (clamped so it never flips) — disabled on mobile to keep HUD centered
     addEventListener("mousemove", (e) => {
       document.documentElement.style.setProperty("--mx", e.clientX + "px");
       document.documentElement.style.setProperty("--my", e.clientY + "px");
+
+      if (isMobileHud()){
+        document.documentElement.style.setProperty("--tiltY", "0deg");
+        document.documentElement.style.setProperty("--tiltX", "0deg");
+        return;
+      }
 
       const rect = hud.getBoundingClientRect();
       const cx = rect.left + rect.width/2;
@@ -1096,23 +1219,13 @@
     });
 
     // ================================================================
-    // STREAM SEARCH ENGINE
+    // STREAM SEARCH ENGINE — local proxy only (proxy.js)
     //
-    // Priority order for BOTH search and stream resolution:
-    //   1. Local proxy  (proxy.js running on localhost:8080)
-    //      → hits YouTube InnerTube / stream URLs directly, adds CORS headers
-    //   2. Public Piped instances (CORS-open; no local server needed)
-    //      → used automatically when proxy.js is not running
-    //
-    // Run `node proxy.js` in the same folder to enable the fast path.
+    // Run `node proxy.js` in the same folder (default http://localhost:8080).
+    // The proxy hits YouTube InnerTube / stream URLs and adds CORS headers.
     // ================================================================
 
-    const LOCAL_PROXY     = "http://localhost:8080";
-    const PIPED_INSTANCES = [
-      "https://pipedapi.kavin.rocks",
-      "https://piped-api.garudalinux.org",
-      "https://api.piped.projectsegfau.lt",
-    ];
+    const LOCAL_PROXY = "https://mortality-pull-bureau-soil.trycloudflare.com";
 
     // Rewrite a YouTube URL so it goes through proxy.js
     // proxy.js reads ?__host, forwards there, adds CORS headers
@@ -1132,7 +1245,7 @@
       try {
         const ctrl = new AbortController();
         setTimeout(() => ctrl.abort(), 900);
-        const r = await fetch(`${LOCAL_PROXY}/ping`, { signal: ctrl.signal });
+        await fetch(`${LOCAL_PROXY}/ping`, { signal: ctrl.signal });
         // proxy.js returns 200 for /ping; any response means it's up
         _proxyAlive = true;
       } catch (_) {
@@ -1141,11 +1254,7 @@
       return _proxyAlive;
     }
 
-    // ---- SEARCH ----
-    // Try local proxy (InnerTube) first, then each Piped instance
-
     async function innertubeSearchViaProxy(query) {
-      // Use YouTube Music's InnerTube endpoint — returns audio tracks as first priority
       const body = JSON.stringify({
         query,
         context: {
@@ -1175,7 +1284,6 @@
       if (!res.ok) throw new Error(`proxy search ${res.status}`);
       const data = await res.json();
 
-      // YTM response structure: musicShelfRenderer inside sectionListRenderer
       const tracks = [];
       const tabs = data?.contents?.tabbedSearchResultsRenderer?.tabs ?? [];
       for (const tab of tabs) {
@@ -1210,55 +1318,15 @@
       return tracks;
     }
 
-    async function innertubeSearchViaPiped(query) {
-      let lastErr = null;
-      for (const base of PIPED_INSTANCES) {
-        try {
-          const res = await fetchWithTimeout(
-            `${base}/search?q=${encodeURIComponent(query)}&filter=music_songs`,
-            {}, 10000
-          );
-          if (!res.ok) throw new Error(`piped search ${res.status}`);
-          const data = await res.json();
-          const tracks = [];
-          for (const item of (data?.items ?? [])) {
-            if (item.type && item.type !== "stream") continue;
-            const id = item.url?.replace("/watch?v=", "") || item.videoId || "";
-            if (!id) continue;
-            tracks.push({
-              id, name: item.title || "Unknown", artist: item.uploaderName || "",
-              album: "", duration: item.duration ?? 0, pic: item.thumbnail || "",
-            });
-            if (tracks.length >= 20) break;
-          }
-          return tracks;
-        } catch (e) {
-          lastErr = e;
-          console.info(`[Search/Piped] ${base}:`, e.message);
-        }
-      }
-      throw lastErr || new Error("all piped search instances failed");
-    }
-
     async function innertubeSearch(query) {
       if (await proxyAlive()) {
-        try {
-          console.info("[Search] using local proxy");
-          return await innertubeSearchViaProxy(query);
-        } catch (e) {
-          console.info("[Search] proxy failed, falling back to Piped:", e.message);
-        }
+        console.info("[Search] using local proxy");
+        return await innertubeSearchViaProxy(query);
       }
-      console.info("[Search] using Piped");
-      return await innertubeSearchViaPiped(query);
+      throw new Error("proxy unavailable");
     }
 
-    // ---- STREAM RESOLUTION ----
-    // Try local proxy (direct YouTube stream URL) first, then Piped
-
     async function getAudioUrlViaProxy(videoId) {
-      // Delegate stream resolution to yt-dlp running inside proxy.js.
-      // proxy.js exposes GET /stream/:videoId → { url: "https://..." }
       const res = await fetchWithTimeout(
         `${LOCAL_PROXY}/stream/${videoId}`,
         {},
@@ -1272,46 +1340,12 @@
       return localProxyUrl(data.url);
     }
 
-    async function getAudioUrlViaPiped(videoId) {
-      // Route Piped through local proxy if available to avoid CORS issues
-      // with public instances that may have broken headers
-      const proxyUp = await proxyAlive();
-      let lastErr = null;
-      for (const base of PIPED_INSTANCES) {
-        try {
-          const fetchUrl = proxyUp
-            ? localProxyUrl(`${base}/streams/${videoId}`)
-            : `${base}/streams/${videoId}`;
-          const res = await fetchWithTimeout(fetchUrl, {}, 10000);
-          if (!res.ok) throw new Error(`piped ${res.status}`);
-          const data = await res.json();
-          const streams = data?.audioStreams ?? [];
-          const best =
-            streams.find(s => s.mimeType?.includes("opus")) ||
-            streams.find(s => s.mimeType?.includes("webm")) ||
-            streams[0];
-          if (!best?.url) throw new Error("no audio stream");
-          // Piped stream URLs also go to googlevideo.com — proxy if available
-          return proxyUp ? localProxyUrl(best.url) : best.url;
-        } catch (e) {
-          lastErr = e;
-          console.info(`[Stream/Piped] ${base}:`, e.message);
-        }
-      }
-      throw lastErr || new Error("all piped stream instances failed");
-    }
-
     async function resolveAudioUrl(videoId) {
       if (await proxyAlive()) {
-        try {
-          console.info("[Stream] using local proxy");
-          return await getAudioUrlViaProxy(videoId);
-        } catch (e) {
-          console.info("[Stream] proxy failed, falling back to Piped:", e.message);
-        }
+        console.info("[Stream] using local proxy");
+        return await getAudioUrlViaProxy(videoId);
       }
-      console.info("[Stream] using Piped");
-      return await getAudioUrlViaPiped(videoId);
+      throw new Error("proxy unavailable");
     }
 
     const searchInput      = document.getElementById("searchInput");
@@ -1390,7 +1424,6 @@
 
         el.append(meta, dur, status);
 
-        // Prewarm on hover — yt-dlp runs while user is reading the title
         let prewarmed = false;
         el.addEventListener("mouseenter", () => {
           if (prewarmed || !track.id) return;
@@ -2278,8 +2311,8 @@
       crtPass.uniforms.cornerX.value = cx;
       crtPass.uniforms.cornerY.value = cy;
 
-      const rxPx = Math.round(clamp(cx * innerWidth * 0.55, 24, 380));
-      const ryPx = Math.round(clamp(cy * innerHeight * 0.55, 24, 380));
+      const rxPx = cx <= 0 ? 0 : Math.round(clamp(cx * innerWidth * 0.55, 24, 380));
+      const ryPx = cy <= 0 ? 0 : Math.round(clamp(cy * innerHeight * 0.55, 24, 380));
       crtFrame.style.setProperty("--rx", rxPx + "px");
       crtFrame.style.setProperty("--ry", ryPx + "px");
     }
@@ -2458,11 +2491,11 @@
     }
 
     function resetDefaults(){
-      shapeEl.value = "sphere";
-      shapeParams = setDefaultShapeParams("sphere");
+      shapeEl.value = "cover";
+      shapeParams = setDefaultShapeParams("cover");
 
-      deformModeEl.value = "liquid";
-      detailEl.value = "5";
+      deformModeEl.value = "breath";
+      detailEl.value = "6";
       deformFreq = 1.0;
 
       sculptColorEl.value = "#cdb4ff";
@@ -2470,32 +2503,36 @@
       bgColorEl.value     = "#07061a";
       wireframeEl.checked = false;
 
-      sensitivityEl.value = "1.35";
-      smoothingEl.value   = "0.88";
-      displacementEl.value= "0.85";
-      rotSpeedEl.value    = "0.18";
+      sensitivityEl.value = "1.40";
+      smoothingEl.value   = "0.50";
+      displacementEl.value= "1.25";
+      rotSpeedEl.value    = "1.20";
 
-      particlesEl.value   = "0.55";
+      particlesEl.value   = "1.00";
       particleCount = 1800;
       particleR0 = 2.35;
       particleR1 = 8.35;
 
-      bloomAmtEl.value    = "0.45";
-      bloom.strength      = 0.45;
+      bloomAmtEl.value    = "0.595";
+      bloom.strength      = 0.595;
       bloom.radius        = 0.55;
       bloom.threshold     = 0.38;
 
-      motionBlurEl.value  = "0.12";
-      afterimagePass.uniforms["damp"].value = +motionBlurEl.value;
+      motionBlurEl.value  = "0";
+      afterimagePass.uniforms["damp"].value = 0;
 
-      crtIntensityEl.value = "0.78";
+      crtIntensityEl.value = "0";
       applyCRTIntensity();
-      crtJitterEl.checked = true;
-      crtPass.uniforms.jitterOn.value = 1.0;
+      crtJitterEl.checked = false;
+      crtPass.uniforms.jitterOn.value = 0.0;
 
-      roundXEl.value = "0.22";
-      roundYEl.value = "0.22";
+      roundXEl.value = "0";
+      roundYEl.value = "0";
       applyRoundness();
+
+      lyricsSizeEl.value = "16";
+      lyricsSizeV.textContent = "16";
+      applyLyricsTheme();
 
       skySpeed = 1.0;
       scene.fog.density = 0.045;
@@ -3267,6 +3304,17 @@
       lyricsOpacityV.textContent = (+lyricsOpacityEl.value).toFixed(2);
       applyLyricsTheme();
     }
+
+    (function applyMobileHudLayout(){
+      if (!window.matchMedia("(max-width: 560px)").matches) return;
+      document.documentElement.style.setProperty("--tiltY", "0deg");
+      document.documentElement.style.setProperty("--tiltX", "0deg");
+      setMinimized(true);
+      document.querySelectorAll("details.group.collapsible").forEach((d) => {
+        const section = d.dataset.section;
+        if (section !== "playback" && section !== "shape") d.open = false;
+      });
+    })();
 
     // ================================================================
     // RGB OVERRIDE ENGINE
