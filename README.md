@@ -57,7 +57,6 @@ Then open `index.html` in your browser. The app detects the proxy automatically.
 - [Three.js](https://threejs.org) — 3D rendering
 - [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API) — audio analysis
 - [lrclib.net](https://lrclib.net) — synced lyrics
-- [Piped](https://github.com/TeamPiped/Piped) — YouTube fallback (no proxy needed)
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) — stream resolution via local proxy
 
 ---
