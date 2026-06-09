@@ -233,7 +233,7 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, "0.0.0.0", () => {
+server.listen(PORT, "127.0.0.1", () => {
   console.log(`\nCRT Audio Sculptures — local proxy running`);
   console.log(`  http://localhost:${PORT}`);
   console.log(`\nKeep this terminal open while using the app.`);
