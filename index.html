@@ -327,6 +327,23 @@
     }
     input[type="range"]{ padding: 9px 10px; }
 
+    .fileVolumeRow{
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 10px;
+      width: 100%;
+      min-width: min(420px, 100%);
+    }
+    .fileVolumeRow .fileLabel{
+      flex: 1 1 200px;
+      min-width: 0;
+    }
+    .fileVolumeRow .volumeLabel{
+      flex: 1 1 120px;
+      min-width: 100px;
+    }
+
     button{
       cursor:pointer;
       background: linear-gradient(180deg, rgba(205,180,255,.22), rgba(125,249,255,.10));
@@ -778,11 +795,17 @@
         <!-- Divider -->
         <div style="width:100%;height:1px;background:rgba(255,255,255,.08);margin:2px 0;"></div>
 
-        <!-- Local file fallback -->
-        <label style="min-width:min(420px,100%);">
-          Local file (fallback)
-          <input id="file" type="file" accept="audio/*" />
-        </label>
+        <!-- Local file fallback + volume -->
+        <div class="fileVolumeRow">
+          <label class="fileLabel">
+            Local file (fallback)
+            <input id="file" type="file" accept="audio/*" />
+          </label>
+          <label class="volumeLabel">
+            Volume <span id="volumeV" style="color:rgba(255,255,255,.75)"></span>
+            <input id="volume" type="range" min="0" max="1" step="0.01" value="1.00" />
+          </label>
+        </div>
 
         <div class="rowBtns">
           <button id="playFile" type="button">Play</button>
@@ -1043,6 +1066,8 @@
     const presetText = document.getElementById("presetText");
 
     const fileInput = document.getElementById("file");
+    const volumeEl = document.getElementById("volume");
+    const volumeV = document.getElementById("volumeV");
     const playFileBtn = document.getElementById("playFile");
     const pauseFileBtn = document.getElementById("pauseFile");
     const stopFileBtn = document.getElementById("stopFile");
@@ -1132,6 +1157,13 @@
     let loudness = 0;      // NEW: smoothed loudness 0..1
 
     let masterGain = null, fileSourceNode = null, streamSourceNode = null, activeStream = null;
+    let volumeLevel = 1.0;
+
+    function applyVolume(){
+      volumeLevel = +volumeEl.value;
+      volumeV.textContent = Math.round(volumeLevel * 100) + "%";
+      if (masterGain) masterGain.gain.value = volumeLevel;
+    }
 
     function ensureAudio(){
       if (audioCtx) return;
@@ -1145,7 +1177,7 @@
       timeData = new Uint8Array(analyser.fftSize);
 
       masterGain = audioCtx.createGain();
-      masterGain.gain.value = 1.0;
+      masterGain.gain.value = volumeLevel;
 
       analyser.connect(masterGain);
       masterGain.connect(audioCtx.destination);
@@ -1165,7 +1197,7 @@
     function connectFileSource(){
       ensureAudio();
       disconnectStreamSource();
-      if (masterGain) masterGain.gain.value = 1.0;
+      if (masterGain) masterGain.gain.value = volumeLevel;
 
       if (!fileSourceNode) fileSourceNode = audioCtx.createMediaElementSource(audioEl);
       try { fileSourceNode.disconnect(); } catch {}
@@ -1216,6 +1248,9 @@
     });
     pauseFileBtn.addEventListener("click", () => { audioEl.pause(); setStatus("paused", false); });
     stopFileBtn.addEventListener("click", () => { audioEl.pause(); audioEl.currentTime = 0; setStatus("stopped", false); });
+
+    volumeEl.addEventListener("input", applyVolume);
+    applyVolume();
 
     smoothingEl.addEventListener("input", () => {
       if (analyser) analyser.smoothingTimeConstant = +smoothingEl.value;
@@ -1458,7 +1493,7 @@
 
         ensureAudio();
         disconnectStreamSource();
-        if (masterGain) masterGain.gain.value = 1.0;
+        if (masterGain) masterGain.gain.value = volumeLevel;
 
         if (objectURL){ URL.revokeObjectURL(objectURL); objectURL = null; }
 
