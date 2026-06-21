@@ -1277,20 +1277,29 @@
       return p.toString();
     }
 
-    // One-time liveness check cached for the session
+    // Liveness check — only a confirmed "alive" result is cached for the
+    // session. A failed/slow ping is NOT cached, so the next search retries
+    // instead of being permanently stuck after one cold first-load timeout.
     let _proxyAlive = null;
-    async function proxyAlive() {
-      if (_proxyAlive !== null) return _proxyAlive;
+    async function pingOnce(timeoutMs) {
       try {
         const ctrl = new AbortController();
-        setTimeout(() => ctrl.abort(), 900);
+        const t = setTimeout(() => ctrl.abort(), timeoutMs);
         await fetch(`${LOCAL_PROXY}/ping`, { signal: ctrl.signal });
-        // proxy.js returns 200 for /ping; any response means it's up
-        _proxyAlive = true;
+        clearTimeout(t);
+        return true;
       } catch (_) {
-        _proxyAlive = false;
+        return false;
       }
-      return _proxyAlive;
+    }
+    async function proxyAlive() {
+      if (_proxyAlive === true) return true;
+      // First attempt: generous timeout to survive a cold tunnel connection.
+      if (await pingOnce(3000)) { _proxyAlive = true; return true; }
+      // Brief backoff, then one retry before giving up for this call.
+      await new Promise(r => setTimeout(r, 400));
+      if (await pingOnce(3000)) { _proxyAlive = true; return true; }
+      return false; // not cached — next call will try again from scratch
     }
 
     async function innertubeSearchViaProxy(query) {
@@ -1362,7 +1371,7 @@
         console.info("[Search] using local proxy");
         return await innertubeSearchViaProxy(query);
       }
-      throw new Error("try reloading the page");
+      throw new Error("proxy unreachable — is proxy.js running and the tunnel up?");
     }
 
     async function getAudioUrlViaProxy(videoId) {
@@ -1384,7 +1393,7 @@
         console.info("[Stream] using local proxy");
         return await getAudioUrlViaProxy(videoId);
       }
-      throw new Error("try reloading the page");
+      throw new Error("proxy unreachable — is proxy.js running and the tunnel up?");
     }
 
     const searchInput      = document.getElementById("searchInput");
