@@ -1,4 +1,14 @@
 # Changelog
+## [1.3] - 2026-06-23
+
+### Changed
+
+* Stop button removed from the player controls.
+* Next track is now prewarmed the moment the current one starts playing, removing the loading delay on transition.
+* Local file picker and the usage hint below it now span the full width of the panel instead of shrinking to content size.
+* Queue panel now shows a live item count, can be minimized/expanded, and each track has its own play button to jump straight to it.
+* Layout: search results now render directly under the search bar, with the player card below them; Previous/Play/Next are centered above the seek bar with volume pinned to the right edge.
+* Searching and playing a new song now starts a fresh autoplay radio mix and clears the previous queue, but playing within the same list (next, previous, or jumping to a queued track) no longer resets it.
 
 ## [1.2] - 2026-06-22
 
