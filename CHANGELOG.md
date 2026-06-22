@@ -1,7 +1,7 @@
 # Changelog
 ## [1.3] - 2026-06-23
 
-### Changed
+### Fixed
 
 * Stop button removed from the player controls.
 * Next track is now prewarmed the moment the current one starts playing, removing the loading delay on transition.
@@ -20,7 +20,7 @@
 - Autoplay/radio mode that starts automatically once a song finishes, based on the played song (similar to YouTube Music).
 - Volume button that mutes/unmutes on click and reveals a volume slider on hover; scrolling the slider adjusts volume in 10% increments.
 
-### Changed
+### Fixed
 - "Now playing" pill at the top of the GUI now displays the song's name instead of "playing file".
 - Redesigned music controls and merged them with the now playing bar under the search bar, combining play/pause into a single button.
 
