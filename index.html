@@ -232,6 +232,13 @@
       min-width: 160px;
     }
 
+    .fileLabel{
+      width:100%;
+    }
+    .fileLabel input[type="file"]{
+      width:100%;
+    }
+
     input, select, button{
       font: inherit;
       color: var(--text);
@@ -351,6 +358,7 @@
     .rowBtns > * { flex: 1; }
 
     .hint{
+      width:100%;
       font-size: 11px;
       color: rgba(255,255,255,.62);
       line-height: 1.35;
@@ -769,9 +777,20 @@
     #transportRow{
       display:flex;
       align-items:center;
-      justify-content:center;
+      justify-content:space-between;
       gap:10px;
       padding: 2px 0;
+    }
+    #transportSpacer{
+      flex:0 0 auto;
+      width:30px; /* matches #volumeBtn width so #transportCenter stays centered */
+    }
+    #transportCenter{
+      flex:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
     }
     .transportBtn{
       flex:0 0 auto;
@@ -800,13 +819,13 @@
     #playPauseBtn svg{ width:17px;height:17px; }
     #playPauseBtn:hover{ background: radial-gradient(circle at 35% 30%, rgba(125,249,255,.42), rgba(125,249,255,.16)); }
 
-    /* volume — icon by default, expands to a slider on hover, scrollable */
+    /* volume — icon by default, expands to a slider on hover, scrollable.
+       Pinned to the right edge of the transport row. */
     #volumeControl{
       position:relative;
       flex:0 0 auto;
       display:flex;
       align-items:center;
-      margin-left:4px;
     }
     #volumeBtn{
       width:30px;height:30px;
@@ -925,6 +944,31 @@
     #queueLabel .radioTag{
       color:rgba(205,180,255,.65);
     }
+    #queueLabelBtns{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex:0 0 auto;
+    }
+    #queueCollapseBtn{
+      cursor:pointer;
+      color:rgba(255,255,255,.35);
+      background:none;
+      border:none;
+      font:inherit;
+      font-size:10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      padding:0;
+      display:flex;
+      align-items:center;
+      gap:3px;
+    }
+    #queueCollapseBtn:hover{ color:rgba(125,249,255,.85); }
+    #queueCollapseBtn svg{
+      width:8px; height:8px; fill:currentColor;
+      transition: transform .15s ease;
+    }
+    #queuePanel.collapsed #queueCollapseBtn svg{ transform: rotate(-90deg); }
     #queueClearBtn{
       cursor:pointer;
       color:rgba(255,255,255,.35);
@@ -936,6 +980,7 @@
       padding:0;
     }
     #queueClearBtn:hover{ color:rgba(255,120,120,.8); }
+    #queuePanel.collapsed .qItem{ display:none; }
     .qItem{
       display:flex;
       align-items:center;
@@ -946,6 +991,18 @@
       background: rgba(255,255,255,.025);
       font-size: 11px;
     }
+    .qItem .qPlay{
+      flex:0 0 auto;
+      width:18px;height:18px;
+      display:flex;align-items:center;justify-content:center;
+      cursor:pointer;
+      color: rgba(125,249,255,.55);
+      background:none; border:none; padding:0;
+      border-radius:50%;
+      transition: color .12s, background .12s;
+    }
+    .qItem .qPlay svg{ width:9px;height:9px; fill:currentColor; }
+    .qItem .qPlay:hover{ color: rgba(125,249,255,.95); background: rgba(125,249,255,.14); }
     .qItem .qTitle{
       flex:1; min-width:0;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
@@ -999,6 +1056,9 @@
           <button id="searchBtn" type="button">Search</button>
         </div>
 
+        <!-- Results list -->
+        <div id="searchResults"></div>
+
         <!-- Unified player: now-playing + transport + seek + volume -->
         <div id="playerCard">
           <div id="nowPlayingBar">
@@ -1012,19 +1072,19 @@
           </div>
 
           <div id="transportRow">
-            <button id="prevBtn" class="transportBtn" type="button" title="Previous">
-              <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zM20 6 10 12l10 6z"/></svg>
-            </button>
-            <button id="playPauseBtn" class="transportBtn" type="button" title="Play/Pause">
-              <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-              <svg id="pauseIcon" viewBox="0 0 24 24" style="display:none;"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>
-            </button>
-            <button id="nextBtn" class="transportBtn" type="button" title="Next">
-              <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM4 6l10 6-10 6z"/></svg>
-            </button>
-            <button id="stopBtn" class="transportBtn" type="button" title="Stop">
-              <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
-            </button>
+            <div id="transportSpacer" aria-hidden="true"></div>
+            <div id="transportCenter">
+              <button id="prevBtn" class="transportBtn" type="button" title="Previous">
+                <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zM20 6 10 12l10 6z"/></svg>
+              </button>
+              <button id="playPauseBtn" class="transportBtn" type="button" title="Play/Pause">
+                <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                <svg id="pauseIcon" viewBox="0 0 24 24" style="display:none;"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>
+              </button>
+              <button id="nextBtn" class="transportBtn" type="button" title="Next">
+                <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM4 6l10 6-10 6z"/></svg>
+              </button>
+            </div>
 
             <div id="volumeControl">
               <button id="volumeBtn" type="button" title="Mute/Unmute (scroll to adjust)">
@@ -1043,9 +1103,6 @@
             <span id="seekDuration">0:00</span>
           </div>
         </div>
-
-        <!-- Results list -->
-        <div id="searchResults"></div>
 
         <!-- Up-next queue -->
         <div id="queuePanel"></div>
@@ -1320,7 +1377,6 @@
     const playPauseBtn = document.getElementById("playPauseBtn");
     const playIcon = document.getElementById("playIcon");
     const pauseIcon = document.getElementById("pauseIcon");
-    const stopBtn = document.getElementById("stopBtn");
 
     const shapeEl = document.getElementById("shape");
     const deformModeEl = document.getElementById("deformMode");
@@ -1527,13 +1583,6 @@
         console.error(e);
         setStatus("playback failed (console)", false);
       }
-    });
-
-    stopBtn.addEventListener("click", () => {
-      audioEl.pause();
-      audioEl.currentTime = 0;
-      setPlayPauseIcon(false);
-      setStatus("stopped", false);
     });
 
     audioEl.addEventListener("play",  () => { setPlayPauseIcon(true);  npDot.classList.add("live"); });
@@ -1929,9 +1978,13 @@
       renderQueuePanel();
     }
 
+    let queueCollapsed = false;
+
     function renderQueuePanel() {
       queuePanel.replaceChildren();
       if (!queue.length) return;
+
+      queuePanel.classList.toggle("collapsed", queueCollapsed);
 
       const label = document.createElement("div");
       label.id = "queueLabel";
@@ -1945,20 +1998,46 @@
         radioTag.textContent = "AUTOPLAY RADIO";
         labelText.appendChild(radioTag);
       }
+      labelText.append(` (${queue.length})`);
       label.appendChild(labelText);
+
+      const btnGroup = document.createElement("div");
+      btnGroup.id = "queueLabelBtns";
+
+      const collapseBtn = document.createElement("button");
+      collapseBtn.id = "queueCollapseBtn";
+      collapseBtn.type = "button";
+      collapseBtn.title = queueCollapsed ? "Expand queue" : "Minimize queue";
+      collapseBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>';
+      collapseBtn.addEventListener("click", () => {
+        queueCollapsed = !queueCollapsed;
+        renderQueuePanel();
+      });
+      btnGroup.appendChild(collapseBtn);
 
       const clearBtn = document.createElement("button");
       clearBtn.id = "queueClearBtn";
       clearBtn.type = "button";
       clearBtn.textContent = "clear";
       clearBtn.addEventListener("click", clearQueue);
-      label.appendChild(clearBtn);
+      btnGroup.appendChild(clearBtn);
 
+      label.appendChild(btnGroup);
       queuePanel.appendChild(label);
 
       queue.forEach((t, i) => {
         const item = document.createElement("div");
         item.className = "qItem";
+
+        const playBtn = document.createElement("button");
+        playBtn.className = "qPlay";
+        playBtn.type = "button";
+        playBtn.title = "Play now";
+        playBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+        playBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          playFromQueue(i);
+        });
 
         const title = document.createElement("div");
         title.className = "qTitle";
@@ -1972,11 +2051,25 @@
         remove.className = "qRemove";
         remove.type = "button";
         remove.textContent = "✕";
-        remove.addEventListener("click", () => removeFromQueue(i));
+        remove.addEventListener("click", (e) => { e.stopPropagation(); removeFromQueue(i); });
 
-        item.append(title, artist, remove);
+        item.append(playBtn, title, artist, remove);
         queuePanel.appendChild(item);
       });
+    }
+
+    // Jump straight to a specific queue item — everything before it is
+    // dropped (already "skipped"), everything after stays queued. This is
+    // a continuation of the same list, so the radio mix must not reset.
+    async function playFromQueue(index){
+      const track = queue[index];
+      if (!track) return;
+      queue.splice(0, index + 1);
+      renderQueuePanel();
+      const resultEl = searchResults.querySelector(`.sResult[data-id="${track.id}"]`);
+      const statusEl = resultEl?.querySelector(".sStatus") || null;
+      await playTrack(track, resultEl, statusEl, { freshPick: false });
+      updatePrevNextButtons();
     }
 
     function clearSearch() {
@@ -2080,7 +2173,19 @@
     // both from a clicked search result AND from queue/radio auto-advance,
     // where there may be no corresponding visible result row.
     async function playTrack(track, el = null, statusEl = null, opts = {}){
-      const { fromHistory = false } = opts;
+      const { fromHistory = false, freshPick = !fromHistory } = opts;
+
+      // A genuinely new manual pick (searched + clicked, or a pasted link)
+      // ends whatever queue/radio was running, exactly like YouTube Music:
+      // picking a new song starts a new autoplay mix. Continuing through
+      // the existing queue/radio (advanceQueue) or going back (prevBtn)
+      // must NOT touch it, so the same autoplay list keeps playing.
+      if (freshPick && !fromHistory) {
+        queue = [];
+        queueIsRadio = false;
+        radioFetchInFlight = null;
+        renderQueuePanel();
+      }
 
       // Push the track that was playing onto history (so prev can return
       // to it), unless this call itself IS a "go back" navigation.
@@ -2249,7 +2354,7 @@
       renderQueuePanel();
       const resultEl = searchResults.querySelector(`.sResult[data-id="${next.id}"]`);
       const statusEl = resultEl?.querySelector(".sStatus") || null;
-      await playTrack(next, resultEl, statusEl);
+      await playTrack(next, resultEl, statusEl, { freshPick: false });
     }
 
     // ---- Transport: prev / next ----
