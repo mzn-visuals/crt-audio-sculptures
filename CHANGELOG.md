@@ -11,8 +11,8 @@
 - Volume button that mutes/unmutes on click and reveals a volume slider on hover; scrolling the slider adjusts volume in 10% increments.
 
 ### Changed
-- "Now playing" pill at the top of the GUI now displays the song's name instead of "playing file"
-- Redesigned music controls and merged them with the now playing bar under the search bar, combining play/pause into a single button
+- "Now playing" pill at the top of the GUI now displays the song's name instead of "playing file".
+- Redesigned music controls and merged them with the now playing bar under the search bar, combining play/pause into a single button.
 
 ## [1.1] - 2026-06-21
 
