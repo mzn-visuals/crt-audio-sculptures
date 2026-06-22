@@ -328,23 +328,6 @@
     }
     input[type="range"]{ padding: 9px 10px; }
 
-    .fileVolumeRow{
-      display: flex;
-      flex-wrap: wrap;
-      align-items: flex-end;
-      gap: 10px;
-      width: 100%;
-      min-width: min(420px, 100%);
-    }
-    .fileVolumeRow .fileLabel{
-      flex: 1 1 200px;
-      min-width: 0;
-    }
-    .fileVolumeRow .volumeLabel{
-      flex: 1 1 120px;
-      min-width: 100px;
-    }
-
     button{
       cursor:pointer;
       background: linear-gradient(180deg, rgba(205,180,255,.22), rgba(125,249,255,.10));
@@ -700,43 +683,78 @@
     .sStatus.err    { color:rgba(255,92,124,.80); }
     .sStatus.ok     { color:rgba(125,249,255,.90); }
 
+    .sBadge{
+      font-size:9px; flex:0 0 auto;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      letter-spacing:.4px;
+      color: rgba(255,255,255,.40);
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.04);
+    }
+    .sBadge.video{ color: rgba(255,200,125,.75); border-color: rgba(255,200,125,.22); background: rgba(255,200,125,.06); }
+
+    .sQueueBtn{
+      flex:0 0 auto;
+      width:22px; height:22px;
+      display:flex; align-items:center; justify-content:center;
+      border-radius: 7px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.05);
+      color: rgba(255,255,255,.55);
+      cursor:pointer;
+      font-size: 13px;
+      line-height:1;
+      transition: background .12s, color .12s, border-color .12s;
+    }
+    .sQueueBtn:hover{ background: rgba(125,249,255,.16); color: rgba(125,249,255,.95); border-color: rgba(125,249,255,.35); }
+    .sQueueBtn.queued{ color: rgba(125,249,255,.85); border-color: rgba(125,249,255,.30); }
+
     #searchStatus{
       font-size:10px;
-      color:rgba(255,255,255,.40);
+      color:rgba(125,249,255,.45);
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       white-space: nowrap;
       flex: 0 0 auto;
     }
 
-    /* now-playing bar inside results */
+    /* ---- unified player card: now-playing + transport + seek ---- */
+    #playerCard{
+      width:100%;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      padding: 10px 12px;
+      border-radius:14px;
+      border:1px solid rgba(125,249,255,.22);
+      background: linear-gradient(180deg, rgba(125,249,255,.08), rgba(125,249,255,.03));
+      margin-bottom:2px;
+    }
+
     #nowPlayingBar{
       display:flex;
       align-items:center; gap:10px;
-      padding: 6px 10px;
-      border-radius:10px;
-      border:1px solid rgba(125,249,255,.25);
-      background: rgba(125,249,255,.07);
-      margin-bottom:2px;
     }
     #nowPlayingThumb{
-      width:32px;height:32px;border-radius:5px;object-fit:cover;
+      width:34px;height:34px;border-radius:7px;object-fit:cover;
       background:rgba(255,255,255,.06); flex:0 0 auto;
       display:none;
     }
     #nowPlayingThumb.visible{ display:block; }
     #nowPlayingMeta{ flex:1; min-width:0; }
     #nowPlayingTitle{
-      font-size:11px;font-weight:600;
+      font-size:12px;font-weight:600;
       color:rgba(125,249,255,.95);
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
     }
     #nowPlayingArtist{
-      font-size:10px;color:rgba(125,249,255,.60);
+      font-size:10px;color:rgba(125,249,255,.58);
       font-family:ui-monospace,monospace;
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
     }
     @keyframes npPulse{
-      0%,100%{ opacity:.55; } 50%{ opacity:1; }
+      0%,100%{ opacity:.45; } 50%{ opacity:1; }
     }
     #npDot{
       width:7px;height:7px;border-radius:50%;
@@ -745,6 +763,208 @@
       flex:0 0 auto;
       animation: npPulse 1.4s ease-in-out infinite;
     }
+    #npDot:not(.live){ animation:none; opacity:.25; box-shadow:none; }
+
+    /* transport: prev / play-pause / next / stop / volume */
+    #transportRow{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      padding: 2px 0;
+    }
+    .transportBtn{
+      flex:0 0 auto;
+      width:34px;height:34px;
+      display:flex;align-items:center;justify-content:center;
+      border-radius:10px;
+      border:1px solid rgba(125,249,255,.20);
+      background: rgba(125,249,255,.05);
+      color: rgba(125,249,255,.85);
+      cursor:pointer;
+      transition: background .14s, border-color .14s, transform .08s;
+    }
+    .transportBtn svg{ width:15px;height:15px; fill:currentColor; }
+    .transportBtn:hover{ background: rgba(125,249,255,.16); border-color: rgba(125,249,255,.42); }
+    .transportBtn:active{ transform: scale(.92); }
+    .transportBtn:disabled{ opacity:.30; cursor:default; }
+    .transportBtn:disabled:hover{ background: rgba(125,249,255,.05); border-color: rgba(125,249,255,.20); transform:none; }
+
+    /* play/pause is the primary action — slightly larger, filled */
+    #playPauseBtn{
+      width:42px;height:42px;
+      border-radius:50%;
+      background: radial-gradient(circle at 35% 30%, rgba(125,249,255,.30), rgba(125,249,255,.10));
+      border-color: rgba(125,249,255,.45);
+    }
+    #playPauseBtn svg{ width:17px;height:17px; }
+    #playPauseBtn:hover{ background: radial-gradient(circle at 35% 30%, rgba(125,249,255,.42), rgba(125,249,255,.16)); }
+
+    /* volume — icon by default, expands to a slider on hover, scrollable */
+    #volumeControl{
+      position:relative;
+      flex:0 0 auto;
+      display:flex;
+      align-items:center;
+      margin-left:4px;
+    }
+    #volumeBtn{
+      width:30px;height:30px;
+      border-radius:9px;
+      border:1px solid rgba(125,249,255,.20);
+      background: rgba(125,249,255,.05);
+      color: rgba(125,249,255,.80);
+      display:flex;align-items:center;justify-content:center;
+      cursor:pointer;
+      flex:0 0 auto;
+      z-index:2;
+      transition: background .14s, border-color .14s;
+    }
+    #volumeBtn svg{ width:14px;height:14px; fill:currentColor; }
+    #volumeBtn:hover{ background: rgba(125,249,255,.16); border-color: rgba(125,249,255,.42); }
+
+    #volumeSliderWrap{
+      width:0;
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      transition: width .18s ease;
+    }
+    #volumeControl:hover #volumeSliderWrap,
+    #volumeControl.expanded #volumeSliderWrap{
+      width:84px;
+    }
+    #volumeSlider{
+      width:76px;
+      margin-left:8px;
+      -webkit-appearance:none; appearance:none;
+      height:5px;
+      border-radius:999px;
+      background: rgba(125,249,255,.18);
+      cursor:pointer;
+      outline:none;
+    }
+    #volumeSlider::-webkit-slider-thumb{
+      -webkit-appearance:none;
+      width:11px;height:11px;border-radius:50%;
+      background: rgba(125,249,255,.95);
+      box-shadow:0 0 6px rgba(125,249,255,.7);
+      cursor:pointer;
+    }
+    #volumeSlider::-moz-range-thumb{
+      width:11px;height:11px;border-radius:50%;border:none;
+      background: rgba(125,249,255,.95);
+      box-shadow:0 0 6px rgba(125,249,255,.7);
+      cursor:pointer;
+    }
+    #volumeSlider::-moz-range-track{
+      height:5px; border-radius:999px;
+      background: rgba(125,249,255,.18);
+    }
+
+    /* seek row: elapsed — bar — total */
+    #seekRow{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    #seekTime, #seekDuration{
+      font-size:9px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: rgba(125,249,255,.55);
+      flex:0 0 auto;
+      min-width:30px;
+      line-height:1;
+    }
+    #seekTime{ text-align:right; }
+    #seekBar{
+      flex:1; min-width:0;
+      -webkit-appearance:none; appearance:none;
+      height:11px;
+      border-radius:999px;
+      background: rgba(125,249,255,.18);
+      cursor:pointer;
+      outline:none;
+    }
+    #seekBar::-webkit-slider-thumb{
+      -webkit-appearance:none;
+      width:11px;height:11px;border-radius:50%;
+      background: rgba(125,249,255,.95);
+      box-shadow:0 0 6px rgba(125,249,255,.7);
+      cursor:pointer;
+    }
+    #seekBar::-moz-range-thumb{
+      width:11px;height:11px;border-radius:50%;border:none;
+      background: rgba(125,249,255,.95);
+      box-shadow:0 0 6px rgba(125,249,255,.7);
+      cursor:pointer;
+    }
+    #seekBar::-moz-range-track{
+      height:11px; border-radius:999px;
+      background: rgba(125,249,255,.18);
+    }
+
+    /* up-next queue panel */
+    #queuePanel{
+      width:100%;
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+    #queuePanel:empty{ display:none; }
+    #queueLabel{
+      font-size:10px;
+      color:rgba(255,255,255,.35);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      letter-spacing:.5px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding: 0 2px;
+    }
+    #queueLabel .radioTag{
+      color:rgba(205,180,255,.65);
+    }
+    #queueClearBtn{
+      cursor:pointer;
+      color:rgba(255,255,255,.35);
+      background:none;
+      border:none;
+      font:inherit;
+      font-size:10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      padding:0;
+    }
+    #queueClearBtn:hover{ color:rgba(255,120,120,.8); }
+    .qItem{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding: 5px 9px;
+      border-radius: 9px;
+      border: 1px solid rgba(255,255,255,.06);
+      background: rgba(255,255,255,.025);
+      font-size: 11px;
+    }
+    .qItem .qTitle{
+      flex:1; min-width:0;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      color: rgba(255,255,255,.70);
+    }
+    .qItem .qArtist{
+      flex:0 1 auto; min-width:0;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      color: rgba(255,255,255,.38);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size:10px;
+    }
+    .qItem .qRemove{
+      flex:0 0 auto;
+      cursor:pointer;
+      color: rgba(255,255,255,.30);
+      background:none; border:none; font:inherit; font-size:13px; padding:0 2px;
+    }
+    .qItem .qRemove:hover{ color: rgba(255,120,120,.85); }
 
   </style>
 </head>
@@ -779,40 +999,65 @@
           <button id="searchBtn" type="button">Search</button>
         </div>
 
-        <!-- Now playing (also shows result count) -->
-        <div id="nowPlayingBar">
-          <img id="nowPlayingThumb" src="" alt="" />
-          <div id="nowPlayingMeta">
-            <div id="nowPlayingTitle">—</div>
-            <div id="nowPlayingArtist">—</div>
+        <!-- Unified player: now-playing + transport + seek + volume -->
+        <div id="playerCard">
+          <div id="nowPlayingBar">
+            <img id="nowPlayingThumb" src="" alt="" />
+            <div id="nowPlayingMeta">
+              <div id="nowPlayingTitle">—</div>
+              <div id="nowPlayingArtist">—</div>
+            </div>
+            <span id="searchStatus"></span>
+            <span id="npDot"></span>
           </div>
-          <span id="searchStatus"></span>
-          <span id="npDot"></span>
+
+          <div id="transportRow">
+            <button id="prevBtn" class="transportBtn" type="button" title="Previous">
+              <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zM20 6 10 12l10 6z"/></svg>
+            </button>
+            <button id="playPauseBtn" class="transportBtn" type="button" title="Play/Pause">
+              <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              <svg id="pauseIcon" viewBox="0 0 24 24" style="display:none;"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>
+            </button>
+            <button id="nextBtn" class="transportBtn" type="button" title="Next">
+              <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM4 6l10 6-10 6z"/></svg>
+            </button>
+            <button id="stopBtn" class="transportBtn" type="button" title="Stop">
+              <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+            </button>
+
+            <div id="volumeControl">
+              <button id="volumeBtn" type="button" title="Mute/Unmute (scroll to adjust)">
+                <svg id="volIconHigh" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                <svg id="volIconMuted" viewBox="0 0 24 24" style="display:none;"><path d="M16.5 12A4.5 4.5 0 0 0 14 8v1.79l2.48 2.48zM19 12c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.42 8.42 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.99 8.99 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18z"/></svg>
+              </button>
+              <div id="volumeSliderWrap">
+                <input id="volumeSlider" type="range" min="0" max="100" step="1" value="100" />
+              </div>
+            </div>
+          </div>
+
+          <div id="seekRow">
+            <span id="seekTime">0:00</span>
+            <input id="seekBar" type="range" min="0" max="100" step="0.1" value="0" />
+            <span id="seekDuration">0:00</span>
+          </div>
         </div>
 
         <!-- Results list -->
         <div id="searchResults"></div>
 
+        <!-- Up-next queue -->
+        <div id="queuePanel"></div>
+
         <!-- Divider -->
         <div style="width:100%;height:1px;background:rgba(255,255,255,.08);margin:2px 0;"></div>
 
-        <!-- Local file fallback + volume -->
-        <div class="fileVolumeRow">
-          <label class="fileLabel">
-            Local file (fallback)
-            <input id="file" type="file" accept="audio/*" />
-          </label>
-          <label class="volumeLabel">
-            Volume <span id="volumeV" style="color:rgba(255,255,255,.75)"></span>
-            <input id="volume" type="range" min="0" max="1" step="0.01" value="1.00" />
-          </label>
-        </div>
-
-        <div class="rowBtns">
-          <button id="playFile" type="button">Play</button>
-          <button id="pauseFile" class="secondary" type="button">Pause</button>
-          <button id="stopFile" class="secondary" type="button">Stop</button>
-        </div>
+        <!-- Local file fallback -->
+        <label class="fileLabel">
+          Local file (fallback)
+          <input id="file" type="file" accept="audio/*" />
+        </label>
 
         <div class="hint">
           Search streams via YouTube. Some tracks may be unavailable. Press <b>M</b> to minimize/expand.
@@ -1067,11 +1312,15 @@
     const presetText = document.getElementById("presetText");
 
     const fileInput = document.getElementById("file");
-    const volumeEl = document.getElementById("volume");
-    const volumeV = document.getElementById("volumeV");
-    const playFileBtn = document.getElementById("playFile");
-    const pauseFileBtn = document.getElementById("pauseFile");
-    const stopFileBtn = document.getElementById("stopFile");
+    const volumeSlider = document.getElementById("volumeSlider");
+    const volumeBtn = document.getElementById("volumeBtn");
+    const volumeControl = document.getElementById("volumeControl");
+    const volIconHigh = document.getElementById("volIconHigh");
+    const volIconMuted = document.getElementById("volIconMuted");
+    const playPauseBtn = document.getElementById("playPauseBtn");
+    const playIcon = document.getElementById("playIcon");
+    const pauseIcon = document.getElementById("pauseIcon");
+    const stopBtn = document.getElementById("stopBtn");
 
     const shapeEl = document.getElementById("shape");
     const deformModeEl = document.getElementById("deformMode");
@@ -1158,12 +1407,22 @@
     let loudness = 0;      // NEW: smoothed loudness 0..1
 
     let masterGain = null, fileSourceNode = null, streamSourceNode = null, activeStream = null;
-    let volumeLevel = 1.0;
+    let volumeLevel = 1.0;   // 0..1, actual gain applied
+    let volumeBeforeMute = 1.0;
+    let isMuted = false;
+
+    function setVolumeIcon(){
+      const muted = isMuted || volumeLevel <= 0.001;
+      volIconHigh.style.display  = muted ? "none" : "";
+      volIconMuted.style.display = muted ? "" : "none";
+    }
+
+    function currentGain(){ return isMuted ? 0 : volumeLevel; }
 
     function applyVolume(){
-      volumeLevel = +volumeEl.value;
-      volumeV.textContent = Math.round(volumeLevel * 100) + "%";
-      if (masterGain) masterGain.gain.value = volumeLevel;
+      volumeLevel = (+volumeSlider.value) / 100;
+      if (masterGain) masterGain.gain.value = currentGain();
+      setVolumeIcon();
     }
 
     function ensureAudio(){
@@ -1178,7 +1437,7 @@
       timeData = new Uint8Array(analyser.fftSize);
 
       masterGain = audioCtx.createGain();
-      masterGain.gain.value = volumeLevel;
+      masterGain.gain.value = currentGain();
 
       analyser.connect(masterGain);
       masterGain.connect(audioCtx.destination);
@@ -1198,7 +1457,7 @@
     function connectFileSource(){
       ensureAudio();
       disconnectStreamSource();
-      if (masterGain) masterGain.gain.value = volumeLevel;
+      if (masterGain) masterGain.gain.value = currentGain();
 
       if (!fileSourceNode) fileSourceNode = audioCtx.createMediaElementSource(audioEl);
       try { fileSourceNode.disconnect(); } catch {}
@@ -1223,6 +1482,13 @@
     }
 
     let objectURL = null;
+    let isLocalFileMode = false; // true = local file playing, false = YTM stream
+
+    function setPlayPauseIcon(playing){
+      playIcon.style.display  = playing ? "none" : "";
+      pauseIcon.style.display = playing ? "" : "none";
+    }
+
     fileInput.addEventListener("change", (e) => {
       const f = e.target.files?.[0];
       if (!f) return;
@@ -1231,26 +1497,83 @@
       audioEl.src = objectURL;
       audioEl.load();
       connectFileSource();
+      isLocalFileMode = true;
+      currentStreamTrack = null;
+      nowPlayingTitle.textContent = f.name.replace(/\.[^.]+$/, "");
+      nowPlayingArtist.textContent = "Local file";
+      nowPlayingThumb.classList.remove("visible");
+      updatePrevNextButtons();
       setStatus("file loaded", false);
     });
 
-    playFileBtn.addEventListener("click", async () => {
-      try{
+    // ---- Unified play/pause — works for both YTM stream and local file,
+    // since both route through the same <audio> element. ----
+    playPauseBtn.addEventListener("click", async () => {
+      try {
+        if (!audioEl.src) { setStatus("choose a file or search first", false); return; }
         ensureAudio();
-        connectFileSource();
-        if (!audioEl.src) return setStatus("choose a file first", false);
         if (audioCtx.state === "suspended") await audioCtx.resume();
-        await audioEl.play();
-        setStatus("playing file", true);
+
+        if (audioEl.paused) {
+          await audioEl.play();
+          setPlayPauseIcon(true);
+          setStatus(isLocalFileMode ? "playing file" : "streaming", true);
+        } else {
+          audioEl.pause();
+          setPlayPauseIcon(false);
+          setStatus(isLocalFileMode ? "paused" : "paused", false);
+        }
       } catch (e){
         console.error(e);
-        setStatus("play failed (console)", false);
+        setStatus("playback failed (console)", false);
       }
     });
-    pauseFileBtn.addEventListener("click", () => { audioEl.pause(); setStatus("paused", false); });
-    stopFileBtn.addEventListener("click", () => { audioEl.pause(); audioEl.currentTime = 0; setStatus("stopped", false); });
 
-    volumeEl.addEventListener("input", applyVolume);
+    stopBtn.addEventListener("click", () => {
+      audioEl.pause();
+      audioEl.currentTime = 0;
+      setPlayPauseIcon(false);
+      setStatus("stopped", false);
+    });
+
+    audioEl.addEventListener("play",  () => { setPlayPauseIcon(true);  npDot.classList.add("live"); });
+    audioEl.addEventListener("pause", () => { setPlayPauseIcon(false); npDot.classList.remove("live"); });
+
+    // ---- Volume: click icon mutes/unmutes, hover/expanded reveals a
+    // slider, scrolling over the control adjusts by 10% per tick. ----
+    volumeBtn.addEventListener("click", () => {
+      if (isMuted) {
+        isMuted = false;
+        volumeSlider.value = Math.round(volumeBeforeMute * 100);
+        volumeLevel = volumeBeforeMute;
+      } else {
+        volumeBeforeMute = volumeLevel;
+        isMuted = true;
+      }
+      if (masterGain) masterGain.gain.value = currentGain();
+      setVolumeIcon();
+    });
+
+    volumeSlider.addEventListener("input", () => {
+      if (isMuted && +volumeSlider.value > 0) isMuted = false;
+      applyVolume();
+    });
+
+    volumeControl.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const step = 10; // ±10% per tick
+      const dir = e.deltaY < 0 ? 1 : -1;
+      const next = clamp((+volumeSlider.value) + dir * step, 0, 100);
+      volumeSlider.value = next;
+      if (isMuted && next > 0) isMuted = false;
+      applyVolume();
+      // Briefly force the slider visible so the change is seen even
+      // when the wheel happens without a hover-driven expand.
+      volumeControl.classList.add("expanded");
+      clearTimeout(volumeControl._collapseT);
+      volumeControl._collapseT = setTimeout(() => volumeControl.classList.remove("expanded"), 900);
+    }, { passive: false });
+
     applyVolume();
 
     smoothingEl.addEventListener("input", () => {
@@ -1302,7 +1625,43 @@
       return false; // not cached — next call will try again from scratch
     }
 
-    async function innertubeSearchViaProxy(query) {
+    // Parses an InnerTube YTM search response into track objects.
+    function parseYtmSearchResponse(data) {
+      const tracks = [];
+      const tabs = data?.contents?.tabbedSearchResultsRenderer?.tabs ?? [];
+      for (const tab of tabs) {
+        const sections = tab?.tabRenderer?.content?.sectionListRenderer?.contents ?? [];
+        for (const section of sections) {
+          const shelf = section?.musicShelfRenderer;
+          if (!shelf) continue;
+
+          for (const item of (shelf.contents ?? [])) {
+            const r = item?.musicResponsiveListItemRenderer;
+            if (!r) continue;
+            const videoId = r.overlay?.musicItemThumbnailOverlayRenderer
+              ?.content?.musicPlayButtonRenderer?.playNavigationEndpoint
+              ?.watchEndpoint?.videoId
+              || r.flexColumns?.[0]?.musicResponsiveListItemFlexColumnRenderer
+              ?.text?.runs?.[0]?.navigationEndpoint?.watchEndpoint?.videoId;
+            if (!videoId) continue;
+
+            const title  = r.flexColumns?.[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text || "Unknown";
+            const artist = r.flexColumns?.[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text || "";
+
+            const durText = r.fixedColumns?.[0]?.musicResponsiveListItemFixedColumnRenderer?.text?.runs?.[0]?.text || "";
+            const parts = durText.split(":").map(Number);
+            const dur = parts.length === 2 ? parts[0]*60+parts[1]
+                      : parts.length === 3 ? parts[0]*3600+parts[1]*60+parts[2] : 0;
+            const pic = r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails?.slice(-1)[0]?.url || "";
+
+            tracks.push({ id: videoId, name: title, artist, album: "", duration: dur, pic, type: "song" });
+          }
+        }
+      }
+      return tracks;
+    }
+
+    async function ytmSearchRaw(query, params) {
       const body = JSON.stringify({
         query,
         context: {
@@ -1313,7 +1672,7 @@
             gl: "US",
           }
         },
-        params: "EgWKAQIIAWoKEAMQBBAKEAUQCQ%3D%3D", // YTM songs filter
+        ...(params ? { params } : {}),
       });
       const url = localProxyUrl(
         "https://music.youtube.com/youtubei/v1/search?key=AIzaSyC9XL3ZjWddXya6X74dJoCTL-KLET5YdCE"
@@ -1330,40 +1689,20 @@
         body,
       }, 12000);
       if (!res.ok) throw new Error(`proxy search ${res.status}`);
-      const data = await res.json();
+      return res.json();
+    }
 
-      const tracks = [];
-      const tabs = data?.contents?.tabbedSearchResultsRenderer?.tabs ?? [];
-      for (const tab of tabs) {
-        const sections = tab?.tabRenderer?.content?.sectionListRenderer?.contents ?? [];
-        for (const section of sections) {
-          const shelf = section?.musicShelfRenderer;
-          if (!shelf) continue;
-          for (const item of (shelf.contents ?? [])) {
-            const r = item?.musicResponsiveListItemRenderer;
-            if (!r) continue;
-            const videoId = r.overlay?.musicItemThumbnailOverlayRenderer
-              ?.content?.musicPlayButtonRenderer?.playNavigationEndpoint
-              ?.watchEndpoint?.videoId
-              || r.flexColumns?.[0]?.musicResponsiveListItemFlexColumnRenderer
-              ?.text?.runs?.[0]?.navigationEndpoint?.watchEndpoint?.videoId;
-            if (!videoId) continue;
-            const title  = r.flexColumns?.[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text || "Unknown";
-            const artist = r.flexColumns?.[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text || "";
-            const durText = r.fixedColumns?.[0]?.musicResponsiveListItemFixedColumnRenderer?.text?.runs?.[0]?.text || "";
-            const parts = durText.split(":").map(Number);
-            const dur = parts.length === 2 ? parts[0]*60+parts[1]
-                      : parts.length === 3 ? parts[0]*3600+parts[1]*60+parts[2] : 0;
-            const pic = r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails?.slice(-1)[0]?.url || "";
-            tracks.push({ id: videoId, name: title, artist, album: "", duration: dur, pic });
-            if (tracks.length >= 20) break;
-          }
-          if (tracks.length >= 20) break;
-        }
-        if (tracks.length >= 20) break;
+    async function innertubeSearchViaProxy(query) {
+      // Songs-only filter — the original, known-reliable call.
+      const songsData = await ytmSearchRaw(query, "EgWKAQIIAWoKEAMQBBAKEAUQCQ%3D%3D");
+      const songTracks = parseYtmSearchResponse(songsData);
+
+      if (!songTracks.length) {
+        console.warn("[Search] parse failed — raw response:", songsData);
+        throw new Error("proxy: no YTM results parsed");
       }
-      if (!tracks.length) throw new Error("proxy: no YTM results parsed");
-      return tracks;
+
+      return songTracks.slice(0, 20);
     }
 
     async function innertubeSearch(query) {
@@ -1396,6 +1735,146 @@
       throw new Error("proxy unreachable — is proxy.js running and the tunnel up?");
     }
 
+    // Fire-and-forget prewarm — tells proxy.js to resolve+cache a stream
+    // URL via yt-dlp ahead of time, so playback has no delay later.
+    function prewarmTrack(videoId) {
+      if (!videoId) return;
+      proxyAlive().then(alive => {
+        if (!alive) return;
+        fetch(`${LOCAL_PROXY}/prewarm/${videoId}`).catch(() => {});
+      });
+    }
+
+    // ---- YouTube Music "radio" autoplay queue ----
+    // Calls InnerTube's /next endpoint with the song's auto-mix playlist
+    // (RDAMVM<videoId>), which is the exact same mechanism YouTube Music
+    // itself uses to build the "up next" queue after a track plays.
+    async function fetchRadioQueue(videoId) {
+      const body = JSON.stringify({
+        videoId,
+        playlistId: "RDAMVM" + videoId,
+        context: {
+          client: {
+            clientName: "WEB_REMIX",
+            clientVersion: "1.20240101.00.00",
+            hl: "en",
+            gl: "US",
+          }
+        },
+      });
+      const url = localProxyUrl(
+        "https://music.youtube.com/youtubei/v1/next?key=AIzaSyC9XL3ZjWddXya6X74dJoCTL-KLET5YdCE"
+      );
+      const res = await fetchWithTimeout(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-YouTube-Client-Name": "67",
+          "X-YouTube-Client-Version": "1.20240101.00.00",
+          "Origin": "https://music.youtube.com",
+          "Referer": "https://music.youtube.com/",
+        },
+        body,
+      }, 12000);
+      if (!res.ok) throw new Error(`proxy next ${res.status}`);
+      const data = await res.json();
+
+      const items =
+        data?.contents?.singleColumnMusicWatchNextResultsRenderer
+          ?.tabbedRenderer?.watchNextTabbedResultsRenderer?.tabs?.[0]
+          ?.tabRenderer?.content?.musicQueueRenderer?.content
+          ?.playlistPanelRenderer?.contents ?? [];
+
+      const tracks = [];
+      for (const item of items) {
+        const r = item?.playlistPanelVideoRenderer;
+        if (!r?.videoId) continue;
+        if (r.videoId === videoId) continue; // skip the seed track itself
+        const title  = r.title?.runs?.[0]?.text || "Unknown";
+        const artist = r.longBylineText?.runs?.[0]?.text || r.shortBylineText?.runs?.[0]?.text || "";
+        const pic    = r.thumbnail?.thumbnails?.slice(-1)[0]?.url || "";
+        const lenText = r.lengthText?.runs?.[0]?.text || "";
+        const parts = lenText.split(":").map(Number);
+        const dur = parts.length === 2 ? parts[0]*60+parts[1]
+                  : parts.length === 3 ? parts[0]*3600+parts[1]*60+parts[2] : 0;
+        tracks.push({ id: r.videoId, name: title, artist, album: "", duration: dur, pic, type: "song" });
+      }
+      return tracks;
+    }
+
+    // ---- Resolve a single pasted YouTube/YTM link into a track object ----
+    function extractYouTubeVideoId(text) {
+      try {
+        const u = new URL(text.trim());
+        const host = u.hostname.replace(/^www\./, "");
+        if (host === "youtu.be") {
+          const id = u.pathname.slice(1);
+          return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
+        }
+        if (host === "youtube.com" || host === "music.youtube.com" || host === "m.youtube.com") {
+          const v = u.searchParams.get("v");
+          if (v && /^[A-Za-z0-9_-]{11}$/.test(v)) return v;
+          const shortsMatch = u.pathname.match(/^\/shorts\/([A-Za-z0-9_-]{11})/);
+          if (shortsMatch) return shortsMatch[1];
+        }
+      } catch (_) { /* not a URL */ }
+      return null;
+    }
+
+    async function lookupSingleVideo(videoId) {
+      // /next without a prior queue context still returns watch metadata
+      // for the seed video itself plus its radio mix — we just want the
+      // seed track's title/artist/thumb here.
+      const body = JSON.stringify({
+        videoId,
+        context: {
+          client: {
+            clientName: "WEB_REMIX",
+            clientVersion: "1.20240101.00.00",
+            hl: "en",
+            gl: "US",
+          }
+        },
+      });
+      const url = localProxyUrl(
+        "https://music.youtube.com/youtubei/v1/next?key=AIzaSyC9XL3ZjWddXya6X74dJoCTL-KLET5YdCE"
+      );
+      const res = await fetchWithTimeout(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-YouTube-Client-Name": "67",
+          "X-YouTube-Client-Version": "1.20240101.00.00",
+          "Origin": "https://music.youtube.com",
+          "Referer": "https://music.youtube.com/",
+        },
+        body,
+      }, 12000);
+      if (!res.ok) throw new Error(`proxy next ${res.status}`);
+      const data = await res.json();
+
+      const items =
+        data?.contents?.singleColumnMusicWatchNextResultsRenderer
+          ?.tabbedRenderer?.watchNextTabbedResultsRenderer?.tabs?.[0]
+          ?.tabRenderer?.content?.musicQueueRenderer?.content
+          ?.playlistPanelRenderer?.contents ?? [];
+
+      const seed = items
+        .map(i => i?.playlistPanelVideoRenderer)
+        .find(r => r?.videoId === videoId);
+      if (!seed) throw new Error("could not resolve pasted link");
+
+      const title  = seed.title?.runs?.[0]?.text || "Unknown";
+      const artist = seed.longBylineText?.runs?.[0]?.text || seed.shortBylineText?.runs?.[0]?.text || "";
+      const pic    = seed.thumbnail?.thumbnails?.slice(-1)[0]?.url || "";
+      const lenText = seed.lengthText?.runs?.[0]?.text || "";
+      const parts = lenText.split(":").map(Number);
+      const dur = parts.length === 2 ? parts[0]*60+parts[1]
+                : parts.length === 3 ? parts[0]*3600+parts[1]*60+parts[2] : 0;
+
+      return { id: videoId, name: title, artist, album: "", duration: dur, pic, type: "song" };
+    }
+
     const searchInput      = document.getElementById("searchInput");
     const searchBtn        = document.getElementById("searchBtn");
     const searchClearBtn   = document.getElementById("searchClearBtn");
@@ -1405,9 +1884,100 @@
     const nowPlayingThumb  = document.getElementById("nowPlayingThumb");
     const nowPlayingTitle  = document.getElementById("nowPlayingTitle");
     const nowPlayingArtist = document.getElementById("nowPlayingArtist");
+    const npDot            = document.getElementById("npDot");
+    const queuePanel       = document.getElementById("queuePanel");
+    const transportRow     = document.getElementById("transportRow");
+    const prevBtn          = document.getElementById("prevBtn");
+    const nextBtn          = document.getElementById("nextBtn");
+    const seekBar          = document.getElementById("seekBar");
+    const seekTime         = document.getElementById("seekTime");
+    const seekDuration     = document.getElementById("seekDuration");
 
     let currentStreamTrack = null;
     let lastPicUrl = null;
+
+    // ---- Queue state ----
+    // queue: array of track objects waiting to play next.
+    // queueIsRadio: true when the queue was auto-populated by the YTM-style
+    // radio/autoplay mix rather than tracks the user explicitly queued —
+    // lets us label it and let a manual "+" queue add take priority.
+    let queue = [];
+    let queueIsRadio = false;
+    let radioFetchInFlight = null; // Promise, so ended-handler + prewarm don't double-fetch
+
+    // History of previously-played stream tracks, for the prev button.
+    // The currently-playing track is NOT in this list — only what came before it.
+    let playHistory = [];
+
+    function enqueueTrack(track) {
+      // A manual queue add ends any auto radio mix — the user's choice wins.
+      if (queueIsRadio) { queue = []; queueIsRadio = false; }
+      queue.push(track);
+      renderQueuePanel();
+      // Prewarm immediately if this is the only thing up next.
+      if (queue.length === 1) prewarmTrack(track.id);
+    }
+
+    function removeFromQueue(index) {
+      queue.splice(index, 1);
+      renderQueuePanel();
+    }
+
+    function clearQueue() {
+      queue = [];
+      queueIsRadio = false;
+      renderQueuePanel();
+    }
+
+    function renderQueuePanel() {
+      queuePanel.replaceChildren();
+      if (!queue.length) return;
+
+      const label = document.createElement("div");
+      label.id = "queueLabel";
+      const labelText = document.createElement("span");
+      labelText.textContent = queueIsRadio
+        ? "UP NEXT · "
+        : "UP NEXT";
+      if (queueIsRadio) {
+        const radioTag = document.createElement("span");
+        radioTag.className = "radioTag";
+        radioTag.textContent = "AUTOPLAY RADIO";
+        labelText.appendChild(radioTag);
+      }
+      label.appendChild(labelText);
+
+      const clearBtn = document.createElement("button");
+      clearBtn.id = "queueClearBtn";
+      clearBtn.type = "button";
+      clearBtn.textContent = "clear";
+      clearBtn.addEventListener("click", clearQueue);
+      label.appendChild(clearBtn);
+
+      queuePanel.appendChild(label);
+
+      queue.forEach((t, i) => {
+        const item = document.createElement("div");
+        item.className = "qItem";
+
+        const title = document.createElement("div");
+        title.className = "qTitle";
+        title.textContent = t.name || "Unknown";
+
+        const artist = document.createElement("div");
+        artist.className = "qArtist";
+        artist.textContent = t.artist || "";
+
+        const remove = document.createElement("button");
+        remove.className = "qRemove";
+        remove.type = "button";
+        remove.textContent = "✕";
+        remove.addEventListener("click", () => removeFromQueue(i));
+
+        item.append(title, artist, remove);
+        queuePanel.appendChild(item);
+      });
+    }
 
     function clearSearch() {
       searchResults.replaceChildren();
@@ -1467,19 +2037,33 @@
         dur.className = "sDur";
         dur.textContent = fmtDur(track.duration || 0);
 
+        const badge = document.createElement("div");
+        badge.className = "sBadge" + (track.type === "video" ? " video" : "");
+        badge.textContent = track.type === "video" ? "VIDEO" : "SONG";
+
         const status = document.createElement("div");
         status.className = "sStatus";
 
-        el.append(meta, dur, status);
+        const queueBtn = document.createElement("button");
+        queueBtn.className = "sQueueBtn";
+        queueBtn.type = "button";
+        queueBtn.title = "Add to queue";
+        queueBtn.textContent = "+";
+        queueBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          enqueueTrack(track);
+          queueBtn.classList.add("queued");
+          queueBtn.textContent = "✓";
+          setTimeout(() => { queueBtn.classList.remove("queued"); queueBtn.textContent = "+"; }, 1200);
+        });
+
+        el.append(meta, dur, badge, queueBtn, status);
 
         let prewarmed = false;
         el.addEventListener("mouseenter", () => {
           if (prewarmed || !track.id) return;
           prewarmed = true;
-          proxyAlive().then(alive => {
-            if (!alive) return;
-            fetch(`${LOCAL_PROXY}/prewarm/${track.id}`).catch(() => {});
-          });
+          prewarmTrack(track.id);
         });
 
         el.addEventListener("click", () => {
@@ -1492,18 +2076,34 @@
     }
 
     // Load and play a stream track
-    async function playStreamTrack(track, el, statusEl){
-      document.querySelectorAll(".sResult").forEach(r => r.classList.remove("active"));
-      el.classList.add("active");
-      statusEl.className = "sStatus loading";
-      statusEl.textContent = "…";
+    // Core playback — DOM element/status are optional so this can be called
+    // both from a clicked search result AND from queue/radio auto-advance,
+    // where there may be no corresponding visible result row.
+    async function playTrack(track, el = null, statusEl = null, opts = {}){
+      const { fromHistory = false } = opts;
+
+      // Push the track that was playing onto history (so prev can return
+      // to it), unless this call itself IS a "go back" navigation.
+      if (!fromHistory && currentStreamTrack) {
+        playHistory.push(currentStreamTrack);
+        if (playHistory.length > 50) playHistory.shift();
+      }
+
+      if (el) {
+        document.querySelectorAll(".sResult").forEach(r => r.classList.remove("active"));
+        el.classList.add("active");
+      }
+      if (statusEl) {
+        statusEl.className = "sStatus loading";
+        statusEl.textContent = "…";
+      }
 
       try {
         const streamUrl = await resolveAudioUrl(track.id);
 
         ensureAudio();
         disconnectStreamSource();
-        if (masterGain) masterGain.gain.value = volumeLevel;
+        if (masterGain) masterGain.gain.value = currentGain();
 
         if (objectURL){ URL.revokeObjectURL(objectURL); objectURL = null; }
 
@@ -1514,8 +2114,11 @@
         if (audioCtx.state === "suspended") await audioCtx.resume();
         await audioEl.play();
 
-        statusEl.className = "sStatus ok";
-        statusEl.textContent = "▶";
+        isLocalFileMode = false;
+        setPlayPauseIcon(true);
+        updatePrevNextButtons();
+
+        if (statusEl) { statusEl.className = "sStatus ok"; statusEl.textContent = "▶"; }
         setStatus("streaming", true);
 
         currentStreamTrack = {
@@ -1558,25 +2161,168 @@
           if (track.artist || track.name) runAdaptiveColor(track.artist || "", track.name || "");
         }
 
+        // ---- Prewarm what's coming next, right away ----
+        // If something's already queued, warm its stream URL now. If the
+        // queue is empty, kick off the radio-mix fetch immediately (not at
+        // track end) so both the InnerTube lookup AND the yt-dlp resolution
+        // have the whole song's duration to finish in the background.
+        primeUpcomingPlayback();
+
+        // A few seconds before this track ends, double-check the next
+        // item is still warm — covers the case where the proxy's cache
+        // entry happened to expire or the queue changed mid-playback.
+        let safetyArmed = false;
+        audioEl.addEventListener("timeupdate", function safetyPrewarm(){
+          if (safetyArmed) return;
+          if (!Number.isFinite(audioEl.duration)) return;
+          if (audioEl.duration - audioEl.currentTime > 8) return;
+          safetyArmed = true;
+          audioEl.removeEventListener("timeupdate", safetyPrewarm);
+          const upNext = queue[0];
+          if (upNext) prewarmTrack(upNext.id);
+        });
+
         audioEl.addEventListener("ended", () => {
-          statusEl.textContent = "✓";
-          el.classList.remove("active");
-          nowPlayingThumb.classList.remove("visible");
-          nowPlayingTitle.textContent = "—";
-          nowPlayingArtist.textContent = "—";
-          applyAlbumArtTexture(null);
-          setStatus("ready", false);
+          if (statusEl) statusEl.textContent = "✓";
+          if (el) el.classList.remove("active");
+          advanceQueue();
         }, { once: true });
 
       } catch(e){
         console.warn("Stream failed:", e);
-        statusEl.className = "sStatus err";
-        statusEl.textContent = "✕";
-        el.classList.remove("active");
-        el.classList.add("errored");
+        if (statusEl) { statusEl.className = "sStatus err"; statusEl.textContent = "✕"; }
+        if (el) { el.classList.remove("active"); el.classList.add("errored"); }
         setStatus("stream failed", false);
       }
     }
+
+    // Backwards-compatible name used by search-result click handlers.
+    async function playStreamTrack(track, el, statusEl){
+      return playTrack(track, el, statusEl);
+    }
+
+    // Make sure the next thing that will play (queued track, or this
+    // song's radio mix) has its stream URL warming in proxy.js already.
+    function primeUpcomingPlayback(){
+      if (queue.length) {
+        prewarmTrack(queue[0].id);
+        return;
+      }
+      if (!currentStreamTrack?.id) return;
+      const seedId = currentStreamTrack.id;
+      radioFetchInFlight = fetchRadioQueue(seedId)
+        .then(tracks => {
+          // Only apply if we're still on the same track and nothing
+          // else (e.g. a manual queue add) has populated the queue meanwhile.
+          if (currentStreamTrack?.id !== seedId) return;
+          if (queue.length) return;
+          queue = tracks;
+          queueIsRadio = true;
+          renderQueuePanel();
+          if (queue.length) prewarmTrack(queue[0].id);
+        })
+        .catch(e => console.warn("[Radio] fetch failed:", e))
+        .finally(() => { radioFetchInFlight = null; });
+    }
+
+    // Advance to the next track: queue first, falling back to the radio
+    // mix (waiting for the in-flight fetch if it's still running).
+    async function advanceQueue(){
+      nowPlayingThumb.classList.remove("visible");
+      setStatus("ready", false);
+
+      if (!queue.length && radioFetchInFlight) {
+        try { await radioFetchInFlight; } catch (_) {}
+      }
+
+      if (!queue.length) {
+        // Nothing to play — back to idle.
+        currentStreamTrack = null;
+        nowPlayingTitle.textContent = "—";
+        nowPlayingArtist.textContent = "—";
+        applyAlbumArtTexture(null);
+        setPlayPauseIcon(false);
+        return;
+      }
+
+      const next = queue.shift();
+      renderQueuePanel();
+      const resultEl = searchResults.querySelector(`.sResult[data-id="${next.id}"]`);
+      const statusEl = resultEl?.querySelector(".sStatus") || null;
+      await playTrack(next, resultEl, statusEl);
+    }
+
+    // ---- Transport: prev / next ----
+    function updatePrevNextButtons(){
+      prevBtn.disabled = playHistory.length === 0;
+      nextBtn.disabled = isLocalFileMode; // next only makes sense for streams
+    }
+
+    prevBtn.addEventListener("click", async () => {
+      if (!playHistory.length) return;
+      const prevTrack = playHistory.pop();
+      // Put the track we're leaving back at the front of the queue so
+      // "next" after going back doesn't lose it.
+      if (currentStreamTrack) {
+        queue.unshift({
+          id: currentStreamTrack.id,
+          name: currentStreamTrack.title,
+          artist: currentStreamTrack.artist,
+          album: currentStreamTrack.album,
+          pic: currentStreamTrack.picUrl,
+          type: "song",
+        });
+        queueIsRadio = false;
+        renderQueuePanel();
+      }
+      const resultEl = searchResults.querySelector(`.sResult[data-id="${prevTrack.id}"]`);
+      const statusEl = resultEl?.querySelector(".sStatus") || null;
+      await playTrack(
+        { id: prevTrack.id, name: prevTrack.title, artist: prevTrack.artist, album: prevTrack.album, pic: prevTrack.picUrl, type: "song" },
+        resultEl, statusEl, { fromHistory: true }
+      );
+      updatePrevNextButtons();
+    });
+
+    nextBtn.addEventListener("click", async () => {
+      if (isLocalFileMode) return;
+      await advanceQueue();
+      updatePrevNextButtons();
+    });
+
+    // ---- Transport: seek bar ----
+    function fmtTime(sec){
+      if (!Number.isFinite(sec) || sec < 0) return "0:00";
+      const m = Math.floor(sec/60), s = Math.floor(sec%60);
+      return `${m}:${s.toString().padStart(2,"0")}`;
+    }
+
+    let seekDragging = false;
+    audioEl.addEventListener("timeupdate", () => {
+      if (seekDragging) return;
+      if (!Number.isFinite(audioEl.duration) || audioEl.duration <= 0) return;
+      seekBar.max = 100;
+      seekBar.value = (audioEl.currentTime / audioEl.duration) * 100;
+      seekTime.textContent = fmtTime(audioEl.currentTime);
+      seekDuration.textContent = fmtTime(audioEl.duration);
+    });
+    audioEl.addEventListener("loadedmetadata", () => {
+      seekDuration.textContent = fmtTime(audioEl.duration);
+    });
+
+    seekBar.addEventListener("input", () => {
+      seekDragging = true;
+      if (Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
+        const t = (seekBar.value / 100) * audioEl.duration;
+        seekTime.textContent = fmtTime(t);
+      }
+    });
+    seekBar.addEventListener("change", () => {
+      if (Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
+        audioEl.currentTime = (seekBar.value / 100) * audioEl.duration;
+      }
+      seekDragging = false;
+    });
 
     // Search handler
     async function doSearch(){
@@ -1588,8 +2334,18 @@
       searchClearBtn.style.display = "none";
 
       try {
-        const tracks = await innertubeSearch(q);
-        renderResults(tracks);
+        // Pasted YouTube/YTM link — resolve it directly instead of
+        // running it through text search.
+        const pastedId = extractYouTubeVideoId(q);
+        if (pastedId) {
+          searchStatus.textContent = "resolving link…";
+          if (!(await proxyAlive())) throw new Error("proxy unreachable — is proxy.js running and the tunnel up?");
+          const track = await lookupSingleVideo(pastedId);
+          renderResults([track]);
+        } else {
+          const tracks = await innertubeSearch(q);
+          renderResults(tracks);
+        }
       } catch(e){
         searchStatus.textContent = "search failed — " + (e.message || "unknown error");
         console.warn("[Search]", e);
@@ -1601,6 +2357,12 @@
     searchBtn.addEventListener("click", doSearch);
     searchInput.addEventListener("keydown", e => {
       if (e.key === "Enter") doSearch();
+    });
+    // Auto-run search right away when a YouTube/YTM link is pasted in.
+    searchInput.addEventListener("paste", () => {
+      setTimeout(() => {
+        if (extractYouTubeVideoId(searchInput.value.trim())) doSearch();
+      }, 0);
     });
 
     // ---------------- THREE ----------------
@@ -3779,7 +4541,16 @@
       if (activeStream){
         setStatus("capturing", anyAudio);
       } else if (!audioEl.paused && audioEl.src){
-        setStatus("playing file", anyAudio);
+        if (isLocalFileMode) {
+          setStatus("playing file", anyAudio);
+        } else if (currentStreamTrack) {
+          const label = currentStreamTrack.artist
+            ? `${currentStreamTrack.title} — ${currentStreamTrack.artist}`
+            : (currentStreamTrack.title || "streaming");
+          setStatus(label, anyAudio);
+        } else {
+          setStatus("streaming", anyAudio);
+        }
       }
 
       // LYRICS: world-anchor + synced index + beat-pulse + bass scale
