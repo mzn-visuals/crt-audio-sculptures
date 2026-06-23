@@ -1,4 +1,28 @@
 # Changelog
+## [1.4] - 2026-06-23
+
+### Added
+
+* Live percentage readout on the volume button — appears when scrolling, clicking, or dragging the slider, then reverts to the mute/unmute icon.
+* Volume level now persists across reloads.
+* Collapsible tab sections (Playback & Search, Shape & Style, Colors, Audio Reactivity, Effects & CRT, Lyrics) now remember their open/closed state across reloads; first-time default is everything closed except the autoplay queue, on both desktop and mobile.
+* Lyrics font, size, stretch X/Y, opacity, color, and glow color now persist across reloads.
+* Browser tab title now shows the currently playing track's name and artist, reverting to "CRT // AUDIO SCULPTURES" when paused or idle.
+
+### Changed
+
+* Music controls now use the same lavender-to-cyan gradient as the search button across all backgrounds (transport buttons, play/pause, volume, seek bar), extended to every other matching cyan element site-wide (status dots, active search results, queue buttons).
+* Top-left status dot and color-adapt indicator dot now blink in sync with the now-playing dot.
+* Preset pill now shows only the random descriptor name, dropping the numeric stats suffix.
+* Initial load status text changed from "ready" to "happy visualizing"; the brief status shown between track transitions is now blank instead of "ready".
+* Queue collapse arrow enlarged for visibility.
+* Page title changed to "CRT // AUDIO SCULPTURES".
+
+### Fixed
+
+* Clicking mute now visually drops the volume slider to 0 and restores it on unmute, instead of leaving the slider in place.
+* Removed the small blinking dot that sat above the volume control.
+
 ## [1.3] - 2026-06-23
 
 ### Fixed
