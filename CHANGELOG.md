@@ -1,4 +1,10 @@
 # Changelog
+## [1.5] - 2026-06-25
+
+### Fixed
+
+* Search bar's active/focus border now matches the lavender tone of the rest of the controls, instead of standing out in cyan.
+
 ## [1.4] - 2026-06-23
 
 ### Added
