@@ -1,5 +1,9 @@
 # Changelog
-## [1.5] - 2026-06-25
+## [1.5] - 2026-06-25 - 2026-06-27
+
+### Added
+
+* A Windows release of CRT // AUDIO SCULPTURES is now available for download and use. No "proxy.js" required, works right out of the box.
 
 ### Fixed
 

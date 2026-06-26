@@ -4717,5 +4717,43 @@
     }
     animate();
   </script>
+
+  <!-- Tauri desktop app: F11 fullscreen toggle. No-op in browser/GitHub Pages context. -->
+  <script type="module">
+    if (window.__TAURI__) {
+      const { getCurrentWindow } = await import('https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/window.min.js');
+
+      window.addEventListener('keydown', async (e) => {
+        if (e.key === 'F11') {
+          e.preventDefault();
+          const win = getCurrentWindow();
+          const isFullscreen = await win.isFullscreen();
+          const goingFullscreen = !isFullscreen;
+
+          if (goingFullscreen) {
+            // Mirror the windowed->fullscreen path (which never glitches)
+            // by unmaximizing first, instead of going straight from
+            // maximized->fullscreen, which WebView2 doesn't repaint cleanly.
+            const wasMaximized = await win.isMaximized();
+            if (wasMaximized) {
+              await win.unmaximize();
+              await new Promise(r => setTimeout(r, 60));
+            }
+            await win.setFullscreen(true);
+            await win.setDecorations(false);
+          } else {
+            // Exiting fullscreen: always land on a maximized window first
+            // (avoids the maximized->fullscreen transition glitch entirely,
+            // since we never animate through a mid-size windowed state).
+            // From here the user can un-maximize manually via the title bar
+            // if they want a smaller window.
+            await win.setFullscreen(false);
+            await win.setDecorations(true);
+            await win.maximize();
+          }
+        }
+      });
+    }
+  </script>
 </body>
 </html>
