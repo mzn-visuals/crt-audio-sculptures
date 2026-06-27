@@ -1600,8 +1600,16 @@
         document.title = DEFAULT_TITLE;
       }
     }
-    audioEl.addEventListener("play",  () => { setPlayPauseIcon(true);  updateDocTitle(true); });
-    audioEl.addEventListener("pause", () => { setPlayPauseIcon(false); updateDocTitle(false); });
+    audioEl.addEventListener("play",  () => {
+      setPlayPauseIcon(true);
+      updateDocTitle(true);
+      window.__crtDiscord?.update(nowPlayingTitle.textContent, nowPlayingArtist.textContent, audioEl.currentTime, audioEl.duration);
+    });
+    audioEl.addEventListener("pause", () => {
+      setPlayPauseIcon(false);
+      updateDocTitle(false);
+      window.__crtDiscord?.pause(nowPlayingTitle.textContent, nowPlayingArtist.textContent);
+    });
 
     // ---- Volume: click icon mutes/unmutes, hover/expanded reveals a
     // slider, scrolling over the control adjusts by 10% per tick. ----
@@ -2246,6 +2254,22 @@
         audioEl.load();
         connectFileSource();
 
+        // Set track info BEFORE calling play() — the browser's 'play' event
+        // can fire essentially the instant play() is invoked, before any
+        // code after the await runs. If title/artist were set after play(),
+        // any listener reacting to 'play' (like our Discord presence hook)
+        // would briefly see the *previous* track's info. Setting it first
+        // eliminates that race entirely.
+        currentStreamTrack = {
+          title:  track.name,
+          artist: track.artist,
+          album:  track.album,
+          picUrl: track.pic || null,
+          id:     track.id,
+        };
+        nowPlayingTitle.textContent  = track.name   || "—";
+        nowPlayingArtist.textContent = track.artist  || "—";
+
         if (audioCtx.state === "suspended") await audioCtx.resume();
         await audioEl.play();
 
@@ -2255,18 +2279,6 @@
 
         if (statusEl) { statusEl.className = "sStatus ok"; statusEl.textContent = "▶"; }
         setStatus("streaming", true);
-
-        currentStreamTrack = {
-          title:  track.name,
-          artist: track.artist,
-          album:  track.album,
-          picUrl: track.pic || null,
-          id:     track.id,
-        };
-
-        // Update now-playing bar
-        nowPlayingTitle.textContent  = track.name   || "—";
-        nowPlayingArtist.textContent = track.artist  || "—";
         updateDocTitle(!audioEl.paused);
         if (track.pic && track.pic.startsWith("http")){
           nowPlayingThumb.src = track.pic;
@@ -2445,6 +2457,9 @@
     });
     audioEl.addEventListener("loadedmetadata", () => {
       seekDuration.textContent = fmtTime(audioEl.duration);
+      if (!audioEl.paused) {
+        window.__crtDiscord?.update(nowPlayingTitle.textContent, nowPlayingArtist.textContent, audioEl.currentTime, audioEl.duration);
+      }
     });
 
     seekBar.addEventListener("input", () => {
@@ -4723,6 +4738,43 @@
     if (window.__TAURI__) {
       const { getCurrentWindow } = await import('https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/window.min.js');
       const { invoke } = await import('https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/core.min.js');
+
+      // Discord Rich Presence — calls into the Rust commands defined in
+      // lib.rs. Exposed as a global so the main app script (which isn't a
+      // module, and doesn't know/care whether it's running in Tauri or a
+      // plain browser) can call window.__crtDiscord?.update(...) safely.
+      // It's simply undefined outside Tauri, so those calls become no-ops
+      // on the live GitHub Pages site.
+      window.__crtDiscord = {
+        async update(title, artist, elapsed, duration) {
+          if (!title || !Number.isFinite(duration) || duration <= 0) return;
+          try {
+            await invoke('update_discord_presence', {
+              title,
+              artist: artist || '',
+              elapsedSecs: Math.floor(elapsed) || 0,
+              durationSecs: Math.floor(duration),
+            });
+          } catch (err) {
+            console.warn('Discord presence update failed:', err);
+          }
+        },
+        async pause(title, artist) {
+          if (!title) return;
+          try {
+            await invoke('pause_discord_presence', { title, artist: artist || '' });
+          } catch (err) {
+            console.warn('Discord presence pause failed:', err);
+          }
+        },
+        async clear() {
+          try {
+            await invoke('clear_discord_presence');
+          } catch (err) {
+            console.warn('Discord presence clear failed:', err);
+          }
+        },
+      };
 
       window.addEventListener('keydown', async (e) => {
         if (e.key === 'F11') {

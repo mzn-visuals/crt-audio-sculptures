@@ -1,9 +1,12 @@
 # Changelog
-## [1.5] - 2026-06-25 - 2026-06-27
+## [1.6] - 2026-06-27
 
 ### Added
 
 * A Windows release of CRT // AUDIO SCULPTURES is now available for download and use. No "proxy.js" required, works right out of the box.
+* Discord RPC (Rich Presence) - now works with the Windows release.
+
+## [1.5] - 2026-06-25
 
 ### Fixed
 
