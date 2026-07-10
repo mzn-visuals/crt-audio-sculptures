@@ -984,6 +984,130 @@
     }
     #queueClearBtn:hover{ color:rgba(255,120,120,.8); }
     #queuePanel.collapsed .qItem{ display:none; }
+
+    /* ================================================================
+       KONAMI — screen shake keyframes
+    ================================================================ */
+    @keyframes shakeUp    { 0%{transform:translateY(0)} 30%{transform:translateY(-14px)} 60%{transform:translateY(5px)} 100%{transform:translateY(0)} }
+    @keyframes shakeDown  { 0%{transform:translateY(0)} 30%{transform:translateY(14px)}  60%{transform:translateY(-5px)} 100%{transform:translateY(0)} }
+    @keyframes shakeLeft  { 0%{transform:translateX(0)} 30%{transform:translateX(-14px)} 60%{transform:translateX(5px)} 100%{transform:translateX(0)} }
+    @keyframes shakeRight { 0%{transform:translateX(0)} 30%{transform:translateX(14px)}  60%{transform:translateX(-5px)} 100%{transform:translateX(0)} }
+    @keyframes shakeIn    { 0%{transform:scale(1)} 40%{transform:scale(0.94)} 100%{transform:scale(1)} }
+    @keyframes shakeOut   { 0%{transform:scale(1)} 40%{transform:scale(1.06)} 100%{transform:scale(1)} }
+
+    body.shake-up    { animation: shakeUp    0.30s ease-out; }
+    body.shake-down  { animation: shakeDown  0.30s ease-out; }
+    body.shake-left  { animation: shakeLeft  0.30s ease-out; }
+    body.shake-right { animation: shakeRight 0.30s ease-out; }
+    body.shake-in    { animation: shakeIn    0.30s ease-out; }
+    body.shake-out   { animation: shakeOut   0.30s ease-out; }
+
+    /* ================================================================
+       KONAMI MODAL
+    ================================================================ */
+    #konamiOverlay{
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0);
+      backdrop-filter: blur(0px);
+      transition: background .45s ease, backdrop-filter .45s ease;
+      pointer-events: none;
+    }
+    #konamiOverlay.visible{
+      background: rgba(0,0,0,.52);
+      backdrop-filter: blur(8px);
+      pointer-events: all;
+    }
+    #konamiModal{
+      position: relative;
+      width: min(480px, calc(100vw - 40px));
+      border-radius: 22px;
+      border: 1px solid rgba(255,130,180,.32);
+      box-shadow:
+        0 22px 80px rgba(0,0,0,.55),
+        0 0 0 1px rgba(0,0,0,.35) inset,
+        0 0 48px rgba(255,130,180,.22),
+        0 0 28px rgba(205,180,255,.18);
+      backdrop-filter: blur(20px);
+      background:
+        radial-gradient(120% 160% at 50% 0%, rgba(255,255,255,.10), rgba(0,0,0,0) 55%),
+        radial-gradient(90% 140% at 50% 100%, rgba(0,0,0,.55), rgba(0,0,0,0) 55%),
+        repeating-linear-gradient(180deg, rgba(255,255,255,.04) 0px, rgba(255,255,255,.04) 1px, rgba(0,0,0,0) 3px, rgba(0,0,0,0) 6px),
+        rgba(8, 10, 16, .88);
+      opacity: 0;
+      transform: scale(.88) translateY(18px);
+      transition: opacity .38s cubic-bezier(.22,1,.36,1), transform .38s cubic-bezier(.22,1,.36,1);
+      overflow: hidden;
+    }
+    #konamiOverlay.visible #konamiModal{
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+    #konamiModalHeader{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid rgba(255,130,180,.18);
+      background: rgba(0,0,0,.12);
+    }
+    #konamiModalTitle{
+      font-size: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      letter-spacing: .6px;
+      color: rgba(255,255,255,.60);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .konamiHeart{
+      font-size: 15px;
+      display: inline-block;
+      animation: konamiHeartBeat 1.3s ease-in-out infinite;
+      color: rgba(255,130,180,.90);
+    }
+    @keyframes konamiHeartBeat{
+      0%,100%{ transform: scale(1);   }
+      14%    { transform: scale(1.30); }
+      28%    { transform: scale(1);   }
+      42%    { transform: scale(1.18); }
+      70%    { transform: scale(1);   }
+    }
+    #konamiCloseBtn{
+      cursor: pointer;
+      width: 26px; height: 26px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color: rgba(255,255,255,.45);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      line-height: 1;
+      transition: background .12s, color .12s;
+      flex: 0 0 auto;
+      font-family: inherit;
+      padding: 0;
+    }
+    #konamiCloseBtn:hover{ background: rgba(255,80,100,.20); color: rgba(255,130,150,.9); border-color: rgba(255,80,100,.28); }
+    #konamiModalBody{
+      padding: 24px 20px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    #konamiMessage{
+      font-size: 13px;
+      color: rgba(255,255,255,.82);
+      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      min-height: 40px;
+    }
+
     .qItem{
       display:flex;
       align-items:center;
@@ -1316,8 +1440,8 @@
 
         <!-- size & stretch -->
         <label>
-          Font size <span id="lyricsSizeV" style="color:rgba(255,255,255,.75)">16</span>px
-          <input id="lyricsSize" type="range" min="12" max="180" step="1" value="16" />
+          Font size <span id="lyricsSizeV" style="color:rgba(255,255,255,.75)">36</span>px
+          <input id="lyricsSize" type="range" min="12" max="180" step="1" value="36" />
         </label>
         <label>
           Stretch X <span id="lyricsScaleXV" style="color:rgba(255,255,255,.75)">1.00</span>
@@ -1347,6 +1471,22 @@
   </div>
 
   <audio id="audio" crossorigin="anonymous"></audio>
+
+  <!-- KONAMI MODAL -->
+  <div id="konamiOverlay" aria-hidden="true">
+    <div id="konamiModal">
+      <div id="konamiModalHeader">
+        <div id="konamiModalTitle">
+          <span class="konamiHeart">♥</span>
+          <span>for Aydo 🤍</span>
+        </div>
+        <button id="konamiCloseBtn" type="button">✕</button>
+      </div>
+      <div id="konamiModalBody">
+        <div id="konamiMessage">&#8203;</div>
+      </div>
+    </div>
+  </div>
 
   <script type="module">
     import * as THREE from "three";
@@ -1418,11 +1558,13 @@
     }
 
     // minimize
-    function setMinimized(min){
+    const HUD_MIN_KEY = "crt_audio_sculptures_hud_min_v1";
+    function setMinimized(min, save=true){
       hud.classList.toggle("min", !!min);
       hudToggle.textContent = min ? "EXPAND" : "MINIMIZE";
       document.documentElement.style.setProperty("--tiltY", "0deg");
       document.documentElement.style.setProperty("--tiltX", "0deg");
+      if (save) { try { localStorage.setItem(HUD_MIN_KEY, min ? "1" : "0"); } catch(_){} }
     }
     hudToggle.addEventListener("click", () => setMinimized(!hud.classList.contains("min")));
     addEventListener("keydown", (e) => {
@@ -2213,6 +2355,10 @@
     async function playTrack(track, el = null, statusEl = null, opts = {}){
       const { fromHistory = false, freshPick = !fromHistory } = opts;
 
+      // Revert the heart/Konami scene when a new song starts playing,
+      // unless this call IS the Konami song initiating its own playback.
+      if (konamiActive && !opts.konamiPlay) teardownHeartMode();
+
       // A genuinely new manual pick (searched + clicked, or a pasted link)
       // ends whatever queue/radio was running, exactly like YouTube Music:
       // picking a new song starts a new autoplay mix. Continuing through
@@ -2330,11 +2476,22 @@
           if (upNext) prewarmTrack(upNext.id);
         });
 
-        audioEl.addEventListener("ended", () => {
+        function onTrackEnded(){
+          if (konamiActive){
+            // Loop the Konami song — re-register so it fires every time
+            audioEl.addEventListener("ended", onTrackEnded, { once: true });
+            audioEl.currentTime = 0;
+            audioEl.play().catch(() => {});
+            return;
+          }
+          // If this was the Konami song but Konami has since been closed,
+          // make sure the heart scene is fully torn down before advancing
+          if (heartMesh || heartPts) teardownHeartMode();
           if (statusEl) statusEl.textContent = "✓";
           if (el) el.classList.remove("active");
           advanceQueue();
-        }, { once: true });
+        }
+        audioEl.addEventListener("ended", onTrackEnded, { once: true });
 
       } catch(e){
         console.warn("Stream failed:", e);
@@ -3350,6 +3507,7 @@
     wireframeEl.addEventListener("change", () => { applyLook(); setPresetNameFromCurrent(); });
 
     shapeEl.addEventListener("change", () => {
+      if (konamiActive) teardownHeartMode();
       if (!Object.keys(shapeParams).length) shapeParams = setDefaultShapeParams(shapeEl.value);
       rebuildSculpture();
       setPresetNameFromCurrent();
@@ -3486,8 +3644,8 @@
       roundYEl.value = "0";
       applyRoundness();
 
-      lyricsSizeEl.value = "16";
-      lyricsSizeV.textContent = "16";
+      lyricsSizeEl.value = "36";
+      lyricsSizeV.textContent = "36";
       applyLyricsTheme();
 
       skySpeed = 1.0;
@@ -3523,8 +3681,8 @@
       colorAdaptText.textContent = "color adapt";
     }
 
-    randomizeBtn.addEventListener("click", randomizeAll);
-    resetBtn.addEventListener("click", resetDefaults);
+    randomizeBtn.addEventListener("click", () => { if (konamiActive) teardownHeartMode(); randomizeAll(); });
+    resetBtn.addEventListener("click",     () => { if (konamiActive) teardownHeartMode(); resetDefaults(); });
 
     // ================================================================
     // SETTINGS PERSISTENCE — localStorage
@@ -4283,11 +4441,20 @@
       applyVolume();
     }
 
+    // Restore HUD minimized state from localStorage
+    (function restoreHudMin(){
+      try {
+        const saved = localStorage.getItem(HUD_MIN_KEY);
+        if (saved !== null) { setMinimized(saved === "1", false); return; }
+      } catch(_){}
+      // No saved state — start minimized on mobile
+      if (window.matchMedia("(max-width: 560px)").matches) setMinimized(true, false);
+    })();
+
     (function applyMobileHudLayout(){
       if (!window.matchMedia("(max-width: 560px)").matches) return;
       document.documentElement.style.setProperty("--tiltY", "0deg");
       document.documentElement.style.setProperty("--tiltX", "0deg");
-      setMinimized(true);
       if (hadSaved) return; // respect the user's own remembered open/closed state
       document.querySelectorAll("details.group.collapsible").forEach((d) => { d.open = false; });
     })();
@@ -4621,6 +4788,276 @@
 
 
     // ================================================================
+    // HEART GEOMETRY
+    // ================================================================
+
+    function buildHeartGeometry(){
+      // Extruded 2D heart shape — same technique as the cover-art card.
+      // We trace a clean heart outline using cubic bezier curves (matching
+      // the canvas sprite path in makeHeartSprite), then extrude it to give
+      // it real 3D depth, bevelled edges and smooth normals.
+
+      const heartShape = new THREE.Shape();
+
+      // Scale factor — controls overall size
+      const S = 0.072;
+      // The bezier control points are in the same coordinate space as the
+      // canvas sprite (64x64, tip at bottom centre ~(32,54), lobes at top).
+      // We centre and flip-Y so the tip points down in Three.js world space.
+      function p(x, y){ return [(x - 32) * S, -(y - 32) * S]; }
+
+      // Start at the bottom tip
+      heartShape.moveTo(...p(32, 54));
+      // Left side: tip → left lobe
+      heartShape.bezierCurveTo(...p(12,40), ...p(6,28),  ...p(6, 22));
+      // Left lobe arc
+      heartShape.bezierCurveTo(...p(6, 12), ...p(14, 8), ...p(22, 8));
+      // Left lobe → centre dip
+      heartShape.bezierCurveTo(...p(27, 8), ...p(31,12), ...p(32,16));
+      // Centre dip → right lobe
+      heartShape.bezierCurveTo(...p(33,12), ...p(37, 8), ...p(42, 8));
+      // Right lobe arc
+      heartShape.bezierCurveTo(...p(50, 8), ...p(58,12), ...p(58,22));
+      // Right side: right lobe → tip
+      heartShape.bezierCurveTo(...p(58,28), ...p(52,40), ...p(32,54));
+      heartShape.closePath();
+
+      const extrudeSettings = {
+        depth:          1.10,
+        bevelEnabled:   true,
+        bevelThickness: 0.18,
+        bevelSize:      0.16,
+        bevelSegments:  10,
+        curveSegments:  64,
+      };
+
+      const geo = new THREE.ExtrudeGeometry(heartShape, extrudeSettings);
+      // Centre the extrusion on Z so the heart sits symmetrically
+      geo.translate(0, 0, -0.55);
+      geo.computeVertexNormals();
+      return geo;
+    }
+    function makeHeartSprite(){
+      const c = document.createElement("canvas");
+      c.width = c.height = 64;
+      const ctx = c.getContext("2d");
+      ctx.clearRect(0,0,64,64);
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      // Start at the bottom tip of the heart
+      ctx.moveTo(32, 54);
+      // Left side: bottom tip → left lobe
+      ctx.bezierCurveTo(12, 40, 6, 28, 6, 22);
+      // Left lobe top arc
+      ctx.bezierCurveTo(6, 12, 14, 8, 22, 8);
+      // Left lobe → center dip
+      ctx.bezierCurveTo(27, 8, 31, 12, 32, 16);
+      // Center dip → right lobe
+      ctx.bezierCurveTo(33, 12, 37, 8, 42, 8);
+      // Right lobe top arc
+      ctx.bezierCurveTo(50, 8, 58, 12, 58, 22);
+      // Right side: right lobe → bottom tip
+      ctx.bezierCurveTo(58, 28, 52, 40, 32, 54);
+      ctx.closePath();
+      ctx.fill();
+      return new THREE.CanvasTexture(c);
+    }
+
+    // ================================================================
+    // KONAMI ENGINE  (↑ ↑ ↓ ↓ ← → ← → B A Enter)
+    // ================================================================
+
+    const KONAMI_SEQ = [
+      "ArrowUp","ArrowUp","ArrowDown","ArrowDown",
+      "ArrowLeft","ArrowRight","ArrowLeft","ArrowRight",
+      "b","a","Enter"
+    ];
+    const SHAKE_MAP = {
+      "ArrowUp":    "up",
+      "ArrowDown":  "down",
+      "ArrowLeft":  "left",
+      "ArrowRight": "right",
+      "b":          "in",
+      "a":          "out",
+    };
+
+    let konamiIdx     = 0;
+    let konamiActive  = false;
+    let heartMesh     = null;
+    let heartPts      = null, heartPtsGeo = null, heartPtsMat = null, heartSpriteTex = null;
+    let konamiSearchResult = null;
+
+    const konamiOverlay  = document.getElementById("konamiOverlay");
+    const konamiCloseBtn = document.getElementById("konamiCloseBtn");
+    const konamiMsg      = document.getElementById("konamiMessage");
+
+    function closeKonami(){
+      // Only hide the overlay — heart sculpture + particles stay active
+      // until the next song plays or autoplays.
+      konamiOverlay.classList.remove("visible");
+      konamiOverlay.setAttribute("aria-hidden","true");
+    }
+    konamiCloseBtn.addEventListener("click", closeKonami);
+    konamiOverlay.addEventListener("click", e => { if (e.target === konamiOverlay) closeKonami(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && konamiActive) closeKonami(); });
+
+    function triggerShake(cls){
+      if (!cls) return;
+      document.body.classList.remove("shake-up","shake-down","shake-left","shake-right","shake-in","shake-out");
+      // Force reflow
+      void document.body.offsetWidth;
+      document.body.classList.add("shake-" + cls);
+      setTimeout(() => document.body.classList.remove("shake-" + cls), 350);
+    }
+
+    function buildHeartScene(){
+      // Remove the existing sculpture mesh
+      if (sculptureMesh){ sculptureGroup.remove(sculptureMesh); sculptureMesh.geometry.dispose(); }
+
+      const geo = buildHeartGeometry();
+      heartMesh = new THREE.Mesh(geo, sculptureMat);
+      sculptureMesh = heartMesh;
+      sculptureGroup.add(heartMesh);
+
+      // Refresh base deformation arrays
+      basePos  = geo.attributes.position.array.slice();
+      baseNorm = geo.attributes.normal.array.slice();
+      const dd = new Float32Array(basePos.length);
+      for (let i=0; i<dd.length; i+=3){
+        const x=basePos[i],y=basePos[i+1],z=basePos[i+2];
+        const l=Math.max(1e-6,Math.hypot(x,y,z));
+        dd[i]=x/l; dd[i+1]=y/l; dd[i+2]=z/l;
+      }
+      dir = dd;
+    }
+
+    function buildHeartParticles(){
+      // Tear down normal particles
+      if (particles){ fxGroup.remove(particles); particleGeo.dispose(); particleMat.dispose(); particles=null; }
+
+      heartSpriteTex = makeHeartSprite();
+      const N = 2400;
+      heartPtsGeo = new THREE.BufferGeometry();
+      const pos = new Float32Array(N*3), col = new Float32Array(N*3);
+      const cA = new THREE.Color(glowColorEl.value);
+      const cB = new THREE.Color(sculptColorEl.value);
+      for (let i=0; i<N; i++){
+        const r = 2.4 + Math.random()*5.8;
+        const th = Math.random()*Math.PI*2;
+        const ph = Math.acos(2*Math.random()-1);
+        pos[i*3]   = r*Math.sin(ph)*Math.cos(th);
+        pos[i*3+1] = r*Math.cos(ph);
+        pos[i*3+2] = r*Math.sin(ph)*Math.sin(th);
+        const t = Math.random();
+        const c = cA.clone().lerp(cB, t);
+        col[i*3]=c.r; col[i*3+1]=c.g; col[i*3+2]=c.b;
+      }
+      heartPtsGeo.setAttribute("position", new THREE.BufferAttribute(pos,3));
+      heartPtsGeo.setAttribute("color",    new THREE.BufferAttribute(col,3));
+      heartPtsMat = new THREE.PointsMaterial({
+        size: 0.030, map: heartSpriteTex, vertexColors: true,
+        transparent: true, opacity: 0.85, depthWrite: false,
+        alphaTest: 0.08, blending: THREE.AdditiveBlending
+      });
+      heartPts = new THREE.Points(heartPtsGeo, heartPtsMat);
+      fxGroup.add(heartPts);
+    }
+
+    function teardownHeartMode(){
+      konamiActive = false;
+      if (heartMesh){ sculptureGroup.remove(heartMesh); heartMesh.geometry.dispose(); heartMesh=null; sculptureMesh=null; }
+      if (heartPts){ fxGroup.remove(heartPts); heartPtsGeo.dispose(); heartPtsMat.dispose(); heartPts=null; }
+      if (heartSpriteTex){ heartSpriteTex.dispose(); heartSpriteTex=null; }
+      // Restore normal scene
+      rebuildParticles();
+      rebuildSculpture();
+    }
+
+    async function activateKonami(){
+      if (konamiActive){
+        konamiMsg.textContent = "you've been stuck in my head since the night we first VC'd — the realness, the fun, just everything about that night. i'll be honest, i've had something for you since that day. i've admired you in ways i can't fully explain. i actually really like you and i know this is random but you gave me this song and i built all of this around it, around you. ~ mzn";
+        konamiOverlay.classList.add("visible");
+        konamiOverlay.setAttribute("aria-hidden","false");
+        // Re-play the song from the start and re-fetch lyrics
+        try {
+          if (konamiSearchResult){
+            await playTrack(konamiSearchResult, null, null, { freshPick: true, konamiPlay: true });
+          } else {
+            const tracks = await innertubeSearch("Save Your Tears Remix The Weeknd Ariana Grande");
+            if (tracks && tracks.length){
+              konamiSearchResult = tracks[0];
+              await playTrack(konamiSearchResult, null, null, { freshPick: true, konamiPlay: true });
+            }
+          }
+          // Re-fetch lyrics every time
+          lyricsArtistEl.value = "The Weeknd, Ariana Grande";
+          lyricsTitleEl.value  = "Save Your Tears";
+          setTimeout(() => lyricsFetchBtn.click(), 1400);
+        } catch(e){ console.info("[Konami] re-play failed:", e.message); }
+        return;
+      }
+      konamiActive = true;
+
+      // 1. Build heart sculpture + heart particles
+      buildHeartScene();
+      buildHeartParticles();
+
+      // 2. Show modal with message (TBD — placeholder for now)
+      konamiMsg.textContent = "you've been stuck in my head since the night we first VC'd — the realness, the fun, just everything about that night. i'll be honest, i've had something for you since that day. i've admired you in ways i can't fully explain. i actually really like you and i know this is random but you gave me this song and i built all of this around it, around you. ~ mzn";
+      konamiOverlay.classList.add("visible");
+      konamiOverlay.setAttribute("aria-hidden","false");
+
+      // 3. Background: search + play + lyrics + color-adapt
+      try {
+        const tracks = await innertubeSearch("Save Your Tears Remix The Weeknd Ariana Grande");
+        if (tracks && tracks.length){
+          konamiSearchResult = tracks[0];
+          // Play silently (same as clicking a result)
+          await playTrack(konamiSearchResult, null, null, { freshPick: true, konamiPlay: true });
+          // Auto-fetch lyrics
+          lyricsArtistEl.value = "The Weeknd, Ariana Grande";
+          lyricsTitleEl.value  = "Save Your Tears";
+          // Trigger fetch after a moment (audio element needs to load)
+          setTimeout(() => lyricsFetchBtn.click(), 1400);
+          // Color-adapt from thumbnail
+          if (konamiSearchResult.pic){
+            try {
+              const colors = await extractColorsFromImage(konamiSearchResult.pic);
+              applyAdaptivePalette(colors);
+              // Also refresh heart particles with the new palette
+              if (heartPts){ fxGroup.remove(heartPts); heartPtsGeo.dispose(); heartPtsMat.dispose(); heartPts=null; }
+              buildHeartParticles();
+            } catch(_){}
+          }
+        }
+      } catch(e){
+        console.info("[Konami] background init:", e.message);
+      }
+    }
+
+    // Konami key listener
+    window.addEventListener("keydown", e => {
+      // Don't fire inside text inputs
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea") return;
+
+      const key = e.key;
+      const expected = KONAMI_SEQ[konamiIdx];
+
+      if (key === expected){
+        // Trigger shake for all keys except Enter
+        if (key !== "Enter") triggerShake(SHAKE_MAP[key] || null);
+        konamiIdx++;
+        if (konamiIdx === KONAMI_SEQ.length){
+          konamiIdx = 0;
+          activateKonami();
+        }
+      } else {
+        konamiIdx = key === KONAMI_SEQ[0] ? 1 : 0;
+      }
+    });
+
+    // ================================================================
     let t = 0;
     function animate(){
       requestAnimationFrame(animate);
@@ -4681,7 +5118,13 @@
 
       // particles react to LOUDNESS (slider sets base amount)
       const pAmt = +particlesEl.value;
-      if (particles){
+      if (konamiActive && heartPts){
+        const speedBoost = 0.55 + 2.9 * loudness;
+        heartPts.rotation.y += (0.00065 + 0.0030 * Math.max(pAmt,0.5)) * speedBoost;
+        heartPts.rotation.x += (0.00035 + 0.0020 * Math.max(pAmt,0.5)) * speedBoost;
+        heartPtsMat.opacity = Math.min(0.95, (0.10 + 0.78 * Math.max(pAmt,0.5)) * (0.80 + 0.65 * loudness));
+        heartPtsMat.size    = 0.022 + 0.025 * Math.max(pAmt,0.5) + 0.022 * loudness;
+      } else if (particles){
         particles.visible = pAmt > 0.02;
 
         const speedBoost = 0.55 + 2.9 * loudness;
