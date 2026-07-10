@@ -4899,7 +4899,6 @@
     }
     konamiCloseBtn.addEventListener("click", closeKonami);
     konamiOverlay.addEventListener("click", e => { if (e.target === konamiOverlay) closeKonami(); });
-    document.addEventListener("keydown", e => { if (e.key === "Escape" && konamiActive) closeKonami(); });
 
     function triggerShake(cls){
       if (!cls) return;
