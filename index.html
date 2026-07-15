@@ -28,7 +28,15 @@
       --muted: rgba(255,255,255,.68);
       --mx: 50vw;
       --my: 50vh;
+      /* UI accent — updated live from album art */
+      --accent-1: 205,180,255;
+      --accent-2: 125,249,255;
+      /* Hex versions for properties that need hex (borders, shadows, etc) */
+      --accent-1-hex: #cdb4ff;
+      --accent-2-hex: #7df9ff;
     }
+
+
 
     *, *::before, *::after { box-sizing: border-box; }
 
@@ -39,9 +47,9 @@
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
       color: var(--text);
       background:
-        radial-gradient(900px 600px at var(--mx) var(--my), rgba(205,180,255,.16), transparent 60%),
-        radial-gradient(1100px 800px at 20% 15%, rgba(125,249,255,.09), transparent 62%),
-        radial-gradient(900px 700px at 80% 20%, rgba(255,175,210,.07), transparent 60%),
+        radial-gradient(900px 600px at var(--mx) var(--my), rgba(var(--accent-1),.16), transparent 60%),
+        radial-gradient(1100px 800px at 20% 15%, rgba(var(--accent-2),.09), transparent 62%),
+        radial-gradient(900px 700px at 80% 20%, rgba(var(--accent-1),.07), transparent 60%),
         linear-gradient(180deg, #04030b, #07061a);
     }
 
@@ -51,6 +59,8 @@
       z-index: 0;
       display:block;
     }
+
+
 
     /* CRT bezel/glass overlay */
     #crtFrame{
@@ -75,7 +85,7 @@
       border-radius: var(--rx) / var(--ry);
       background:
         radial-gradient(1200px 680px at 35% 8%, rgba(255,255,255,.11), rgba(255,255,255,0) 55%),
-        radial-gradient(900px 540px at 70% 18%, rgba(125,249,255,.07), rgba(125,249,255,0) 60%);
+        radial-gradient(900px 540px at 70% 18%, rgba(var(--accent-2),.07), rgba(var(--accent-2),0) 60%);
       mix-blend-mode: screen;
       opacity: .78;
     }
@@ -88,141 +98,344 @@
       opacity: .88;
       box-shadow:
         0 0 0 2px rgba(0,0,0,.55) inset,
-        0 0 28px rgba(125,249,255,.06),
-        0 0 22px rgba(205,180,255,.05);
+        0 0 28px rgba(var(--accent-2),.06),
+        0 0 22px rgba(var(--accent-1),.05);
     }
 
-    /* ---- bottom dock HUD ---- */
+    /* ================================================================
+       NEW MORPH PILL HUD
+    ================================================================ */
+
+    /* ── PILL ROW WRAPPER ── */
     #hud{
       position: fixed;
       left: 50%;
-      bottom: 16px;
-      width: min(1180px, calc(100vw - 28px));
-      transform: translateX(-50%) perspective(900px) rotateX(var(--tiltX, 0deg)) rotateY(var(--tiltY, 0deg));
-      transform-origin: 50% 100%;
-      transition: transform .06s linear;
+      bottom: 24px;
+      transform: translateX(-50%);
+      width: min(1100px, calc(100vw - 24px));
+      z-index: 10;
+      user-select: none;
+    }
 
-      border-radius: 16px;
-      border: 1px solid var(--panel-brd);
-      box-shadow:
-        0 18px 55px rgba(0,0,0,.45),
-        0 0 0 1px rgba(0,0,0,.35) inset,
-        0 0 28px rgba(205,180,255,.18),
-        0 0 18px rgba(125,249,255,.14);
+    /* pill-row: flex row, morph centered, wings absolute on sides.
+       overflow:visible so expanded morph grows upward outside this box. */
+    .pill-row{
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      height: 110px;
+      overflow: visible;
+    }
 
-      backdrop-filter: blur(14px);
-
+    /* ── MORPH CONTAINER ── */
+    .morph{
       background:
         radial-gradient(120% 160% at 50% 0%, rgba(255,255,255,.10), rgba(0,0,0,0) 55%),
         radial-gradient(90% 140% at 50% 100%, rgba(0,0,0,.55), rgba(0,0,0,0) 55%),
         repeating-linear-gradient(180deg, rgba(255,255,255,.04) 0px, rgba(255,255,255,.04) 1px, rgba(0,0,0,0) 3px, rgba(0,0,0,0) 6px),
-        var(--panel-bg);
-
-      user-select: none;
+        var(--panel-base, rgba(8,10,16,.92));
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(var(--accent-1),.22);
+      box-shadow:
+        0 18px 55px rgba(0,0,0,.55),
+        0 0 28px rgba(var(--accent-1),.18),
+        0 0 18px rgba(var(--accent-2),.14);
+      border-radius: 100px;
+      width: 500px;
+      height: 88px;
+      overflow: hidden;
+      transition:
+        width 0.55s cubic-bezier(0.4,0,0.2,1),
+        height 0.55s cubic-bezier(0.4,0,0.2,1),
+        border-radius 0.55s cubic-bezier(0.4,0,0.2,1),
+        box-shadow 0.4s ease;
+      position: relative;
       z-index: 10;
+      flex-shrink: 0;
+    }
+    .morph.expanded{
+      width: min(1100px, calc(100vw - 24px));
+      /* height is set by JS to the exact content height so CSS can animate it */
+      border-radius: 24px;
+      display: flex;
+      flex-direction: column;
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    /* ── PILL SEEK FILL ── */
+    .pill-seek-wrap{
+      position:absolute; inset:0; border-radius:100px; overflow:hidden; pointer-events:none;
+    }
+    .pill-seek-fill{
+      position:absolute; left:0; top:0; bottom:0; width:0%;
+      background: linear-gradient(90deg, rgba(var(--accent-1),.13), rgba(var(--accent-2),.07));
+      border-radius:100px 0 0 100px;
+      transition: width .1s linear;
+    }
+    .pill-seek-scrub{
+      position:absolute; inset:0; width:100%; height:100%;
+      opacity:0; cursor:pointer; z-index:20;
+      -webkit-appearance:none; appearance:none;
+    }
+    .morph.expanded .pill-seek-scrub,
+    .morph.expanded .pill-seek-wrap{
+      display: none;
+      pointer-events: none;
+    }
+
+    /* ── PILL CONTENT (collapsed face) ── */
+    .pill-content{
+      position: absolute; inset: 0;
+      display: flex; align-items: center;
+      padding: 0 20px; gap: 12px;
+      z-index: 21; pointer-events: none;
+      opacity: 1;
+      transform: scale(1);
+      /* fade IN after morph nearly done collapsing */
+      transition: opacity 0.2s 0.35s, transform 0.2s 0.35s;
+    }
+    .morph.expanded .pill-content{
+      opacity: 0;
+      transform: scale(0.85);
+      pointer-events: none !important;
+      /* fade OUT immediately on expand */
+      transition: opacity 0.15s 0s, transform 0.15s 0s;
+    }
+
+    /* ── CARD CONTENT (expanded face) ── */
+    .card-content{
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      opacity: 0;
+      transform: scale(0.95);
+      /* fade OUT immediately on collapse */
+      transition: opacity 0.15s 0s, transform 0.15s 0s;
+      pointer-events: none;
       overflow: hidden;
     }
+    .morph.expanded .card-content{
+      position: relative;
+      inset: auto;
+      opacity: 1;
+      transform: scale(1);
+      pointer-events: all;
+      /* fade IN after morph nearly done expanding */
+      transition: opacity 0.25s 0.3s, transform 0.25s 0.3s;
+    }
 
-    #hudTop{
-      display:flex;
-      align-items:center;
-      justify-content: space-between;
+    /* card top bar */
+    .card-top{
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px 10px;
+      border-bottom: 1px solid rgba(var(--accent-1),.18);
+      background: rgba(0,0,0,.14);
+      flex: 0 0 auto;
       gap: 10px;
-      padding: 10px 14px;
-      border-bottom: 1px solid rgba(255,255,255,.10);
-      background: rgba(0,0,0,.12);
+      transition: border-color 0.6s ease;
+    }
+    .card-title-area{
+      display:flex; flex-direction:column; gap:4px;
+    }
+    .card-title-area b{
+      font-size: 12px; letter-spacing:.4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      text-shadow: 0 0 10px rgba(var(--accent-2),.14);
+      color: var(--text);
     }
 
-    #hudTop .left{
-      display:flex;
-      flex-direction: column;
-      gap: 6px;
-      min-width: 280px;
-    }
-
-    #hudTop b{
-      font-size: 13px;
-      letter-spacing: .4px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-      text-shadow: 0 0 10px rgba(125,249,255,.14);
-      line-height: 1.1;
-    }
-
+    /* status pills row inside card top */
     .pillRow{
-      display:flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items:center;
+      display:flex; flex-wrap:wrap; gap:8px; align-items:center;
     }
-
     .pill{
-      display:inline-flex;
-      gap: 8px;
-      align-items:center;
-      padding: 2px 10px;
-      border-radius: 999px;
-      background: rgba(255,255,255,.07);
-      border: 1px solid rgba(255,255,255,.10);
-      color: rgba(255,255,255,.80);
-      font-size: 11px;
-      width: fit-content;
-      max-width: min(900px, calc(100vw - 120px));
+      display:inline-flex; gap:8px; align-items:center;
+      padding: 2px 10px; border-radius:999px;
+      background: rgba(var(--accent-1),.08); border:1px solid rgba(var(--accent-1),.18);
+      color: rgba(255,255,255,.80); font-size:11px;
+      width:fit-content; max-width:min(900px, calc(100vw - 120px));
+      transition: background 0.6s ease, border-color 0.6s ease;
     }
     .pill .dot{
-      width: 8px; height: 8px; border-radius: 50%;
-      background: rgba(255,255,255,.22);
-      box-shadow: 0 0 16px rgba(255,255,255,.08);
-      flex: 0 0 auto;
+      width:8px;height:8px;border-radius:50%;
+      background:rgba(255,255,255,.22);
+      box-shadow:0 0 16px rgba(255,255,255,.08); flex:0 0 auto;
     }
     .pill.on .dot{
-      background: linear-gradient(180deg, rgba(205,180,255,.95), rgba(125,249,255,.85));
-      box-shadow: 0 0 18px rgba(205,180,255,.4);
-      animation: npPulse 1.4s ease-in-out infinite;
+      background: linear-gradient(180deg, rgba(var(--accent-1),.95), rgba(var(--accent-2),.85));
+      box-shadow:0 0 18px rgba(var(--accent-1),.4);
+      animation:npPulse 1.4s ease-in-out infinite;
     }
-    .pill .k{
-      opacity:.70;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    .pill .k{ opacity:.70; font-family:ui-monospace,monospace; }
+    #presetText{ overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+
+    /* ── COG ↔ CROSS icon button ── */
+    .icon-btn{
+      background:none; border:none; cursor:pointer;
+      width:40px; height:40px;
+      display:flex; align-items:center; justify-content:center;
+      flex-shrink:0; padding:0;
+      color:rgba(255,255,255,.75);
+      position:relative;
+      border-radius:12px;
+      transition: background .12s;
+      pointer-events: all;
+      z-index: 25;
     }
-    #presetText{
+    .icon-btn:hover{ background:rgba(255,255,255,.08); }
+    .icon-btn svg{ width:22px;height:22px;display:block; }
+
+    .cog-icon,.cross-icon{
+      position:absolute; width:22px;height:22px;
+      transition: opacity .3s, transform .4s cubic-bezier(.4,0,.2,1);
+    }
+    .cross-icon{ opacity:0; transform:rotate(45deg) scale(.6); }
+    .morph.expanded .cog-icon{ opacity:0; transform:rotate(90deg) scale(.6); }
+    .morph.expanded .cross-icon{ opacity:1; transform:rotate(0deg) scale(1); }
+
+    /* pill face art / track info */
+    .art-sm{
+      width:54px; height:54px; border-radius:50%;
+      background: linear-gradient(135deg, rgba(var(--accent-1),.35), rgba(var(--accent-2),.18));
+      border:1px solid rgba(255,255,255,.12);
+      flex-shrink:0;
       overflow:hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .art-sm img{ width:100%;height:100%;object-fit:cover;border-radius:50%; }
+
+    @keyframes spin-art {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+    .art-sm.spinning {
+      animation: spin-art 4s linear infinite;
+    }
+    .pill-track{ flex:1; min-width:0; }
+    .pill-track .t-artist{ font-size:11px; color:rgba(255,255,255,.55); font-family:ui-monospace,monospace; }
+    .pill-track .t-title{ font-size:16px; font-weight:600; color:var(--text); white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+
+    /* ── WINGS ── */
+    .wing{
+      position:absolute; top:50%; transform:translateY(-50%);
+      height:66px; border-radius:100px;
+      z-index:5; overflow:hidden;
+      transition: width .4s cubic-bezier(.4,0,.2,1);
+    }
+    .wing-left{
+      right: calc(50% + 195px);
+      width:130px;
+      background:
+        repeating-linear-gradient(180deg, rgba(255,255,255,.03) 0px, rgba(255,255,255,.03) 1px, rgba(0,0,0,0) 3px, rgba(0,0,0,0) 6px),
+        var(--panel-base, rgba(12,14,22,.88));
+      backdrop-filter:blur(14px);
+      border:1px solid rgba(var(--accent-1),.18);
+      box-shadow:0 8px 28px rgba(0,0,0,.4), 0 0 14px rgba(var(--accent-1),.10);
+      display:flex; align-items:center;
+      padding-right:48px; justify-content:center; gap:8px;
+    }
+    .wing-left.open{ width:240px; }
+
+    .wing-right{
+      left: calc(50% + 195px);
+      width:130px;
+      background:
+        repeating-linear-gradient(180deg, rgba(255,255,255,.03) 0px, rgba(255,255,255,.03) 1px, rgba(0,0,0,0) 3px, rgba(0,0,0,0) 6px),
+        var(--panel-base, rgba(12,14,22,.88));
+      backdrop-filter:blur(14px);
+      border:1px solid rgba(var(--accent-1),.18);
+      box-shadow:0 8px 28px rgba(0,0,0,.4), 0 0 14px rgba(var(--accent-2),.08);
+      display:flex; align-items:center;
+      justify-content:flex-end;
+      padding-left:48px; padding-right:20px;
+      transition: width .4s cubic-bezier(.4,0,.2,1), padding-left .4s cubic-bezier(.4,0,.2,1);
+    }
+    .wing-right.open{ width:240px; padding-left:0; }
+
+    /* ── WING CONTROL BUTTONS ── */
+    .ctrl-btn{
+      background: rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.12); cursor:pointer;
+      width:42px; height:42px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      flex-shrink:0; padding:0; color:rgba(255,255,255,.85);
+      transition: background .14s, border-color .14s, transform .08s;
+    }
+    .ctrl-btn:hover{ background: linear-gradient(180deg, rgba(var(--accent-1),.22), rgba(var(--accent-2),.10)); border-color:rgba(var(--accent-1),.35); }
+    .ctrl-btn:active{ transform:scale(.92); }
+    .ctrl-btn svg{ width:18px;height:18px;display:block;fill:currentColor; }
+
+    .hide-when-closed{
+      overflow:hidden; max-width:0; opacity:0;
+      transition: max-width .35s ease, opacity .25s;
+      display:flex; align-items:center;
+    }
+    .wing-left.open .hide-when-closed{ max-width:52px; opacity:1; }
+
+    /* ── RIGHT WING VOLUME ── */
+    .vol-wrap{
+      position:absolute; inset:0; border-radius:100px; overflow:hidden; pointer-events:none;
+    }
+    .vol-fill{
+      position:absolute; left:0;top:0;bottom:0; width:50%;
+      background: linear-gradient(90deg, rgba(var(--accent-1),.18), rgba(var(--accent-2),.10));
+      border-radius:100px 0 0 100px;
+      transition: width .05s linear;
+    }
+    .vol-center{
+      position:relative; z-index:3;
+      width:42px;height:42px;
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer; flex-shrink:0;
+    }
+    .vol-pct{
+      font-size:12px;font-weight:700;color:rgba(255,255,255,.85);
+      position:absolute; user-select:none;
+      transition:opacity .15s; white-space:nowrap; pointer-events:none;
+      font-family:ui-monospace,monospace;
+    }
+    .vol-center:hover .vol-pct{ opacity:0; }
+    .mute-btn{
+      background: rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.12); cursor:pointer;
+      width:42px;height:42px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      padding:0; color:rgba(255,255,255,.85);
+      position:absolute; opacity:0;
+      transition:opacity .15s, background .15s;
+    }
+    .vol-center:hover .mute-btn{ opacity:1; }
+    .mute-btn:hover{ background: linear-gradient(180deg, rgba(var(--accent-1),.22), rgba(var(--accent-2),.10)); }
+    .mute-btn svg{ width:18px;height:18px;display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round; }
+    .vol-scrub{
+      position:absolute;inset:0;width:100%;height:100%;
+      opacity:0;cursor:pointer;z-index:2; -webkit-appearance:none;
     }
 
-    #hudToggle{
-      cursor:pointer;
-      padding: 8px 10px;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,.12);
-      background: rgba(255,255,255,.06);
-      color: rgba(255,255,255,.86);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-      min-width: 92px;
-    }
-
+    /* ── CARD BODY (scrollable settings) ── */
     #hudBody{
-      padding: 10px 14px 12px;
-      display:flex;
-      flex-direction: column;
-      align-items: stretch;
-      gap: 10px;
-      max-height: min(42vh, calc(100dvh - 140px));
-      overflow-x: hidden;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-gutter: stable;
+      padding:10px 14px 14px;
+      display:flex; flex-direction:column; align-items:stretch; gap:10px;
+      overflow-x:hidden; overflow-y:auto;
+      -webkit-overflow-scrolling:touch;
+      scrollbar-gutter:stable;
+      flex:1; min-height:0;
     }
 
     .group{
-      display:flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: flex-end;
-      padding: 10px;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,.10);
+      display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;
+      padding:10px; border-radius:14px;
+      border:1px solid rgba(var(--accent-1),.14);
       background: rgba(0,0,0,.10);
+      transition: border-color 0.6s ease;
     }
+
+    /* keep hud.min from old code — no longer used but harmless */
+    #hud.min #hudBody{ display:none; }
 
     label{
       display:flex;
@@ -280,13 +493,14 @@
       width: 100%;
       margin: 0 0 10px;
       padding: 0 2px 8px 0;
-      border-bottom: 1px solid rgba(255,255,255,.10);
+      border-bottom: 1px solid rgba(var(--accent-1),.20);
       font-size: 11px;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
       color: rgba(255,255,255,.86);
       letter-spacing: .35px;
       cursor: pointer;
       user-select: none;
+      transition: color 0.6s ease, border-color 0.6s ease;
     }
     details.group:not([open]) > summary.groupSummary{
       margin-bottom: 0;
@@ -338,9 +552,9 @@
 
     button{
       cursor:pointer;
-      background: linear-gradient(180deg, rgba(205,180,255,.22), rgba(125,249,255,.10));
-      border-color: rgba(205,180,255,.32);
-      text-shadow: 0 0 10px rgba(125,249,255,.12);
+      background: linear-gradient(180deg, rgba(var(--accent-1),.22), rgba(var(--accent-2),.10));
+      border-color: rgba(var(--accent-1),.32);
+      text-shadow: 0 0 10px rgba(var(--accent-2),.12);
     }
     button.secondary{
       background: rgba(255,255,255,.06);
@@ -366,37 +580,20 @@
       max-width: 560px;
     }
 
-    #hud.min #hudBody{ display:none; }
-    #hud.min { width: min(560px, calc(100vw - 28px)); }
-
     @media (max-width: 560px){
       #crtFrame{ inset: 8px; }
-      #hud{
-        left: max(8px, env(safe-area-inset-left, 0px));
-        right: max(8px, env(safe-area-inset-right, 0px));
-        width: auto;
-        max-width: none;
-        transform: none;
-        bottom: max(8px, env(safe-area-inset-bottom, 8px));
-      }
-      #hud.min{
-        left: max(8px, env(safe-area-inset-left, 0px));
-        right: max(8px, env(safe-area-inset-right, 0px));
-        width: auto;
-      }
-      #hudTop{ padding: 8px 12px 8px 10px; gap: 8px; }
-      #hudTop .left{ min-width: 0; flex: 1; }
-      #hudTop b{ font-size: 11px; }
-      #hudToggle{ min-width: 72px; padding: 7px 8px; font-size: 10px; }
-      #hudBody{
-        padding: 8px 12px 10px 10px;
-        max-height: min(58vh, calc(100dvh - 88px));
-        gap: 8px;
-      }
-      .group{ width: 100%; padding: 8px 10px 8px 8px; }
+      #hud{ bottom: max(8px, env(safe-area-inset-bottom, 8px)); }
+      .pill-row{ width: calc(100vw - 16px); }
+      .wing-left{ right: calc(50% + 148px); width: 96px; }
+      .wing-left.open{ width: 190px; }
+      .wing-right{ left: calc(50% + 148px); width: 96px; }
+      .wing-right.open{ width: 190px; }
+      .morph{ width: 296px; }
+      .morph.expanded{ width: calc(100vw - 16px); max-height: calc(100vh - 75px); }
+      #hudBody{ padding: 8px 10px 10px; gap: 8px; }
+      .group{ width: 100%; padding: 8px; }
       label{ min-width: 100%; }
       .rowBtns{ flex-direction: column; }
-      .pill{ max-width: 100%; font-size: 10px; }
       details.group > summary.groupSummary{ font-size: 10px; }
     }
 
@@ -434,7 +631,7 @@
       --lyric-scale-y: 1;
       --lyric-opacity: 0.85;
       --lyric-color: #ffffff;
-      --lyric-glow: #cdb4ff;
+      --lyric-glow: var(--accent-1-hex);
       --lyric-glow-a: 0.33;
       --lyric-font: Impact, "Arial Narrow", sans-serif;
     }
@@ -537,8 +734,8 @@
       transition: background .4s, border-color .4s;
     }
     #colorAdaptPill.active{
-      background: linear-gradient(180deg, rgba(205,180,255,.20), rgba(125,249,255,.08));
-      border-color: rgba(205,180,255,.42);
+      background: linear-gradient(180deg, rgba(var(--accent-1),.20), rgba(var(--accent-2),.08));
+      border-color: rgba(var(--accent-1),.42);
     }
     #colorAdaptDot{
       width:7px; height:7px; border-radius:50%;
@@ -547,8 +744,8 @@
       transition: background .4s;
     }
     #colorAdaptPill.active #colorAdaptDot{
-      background: linear-gradient(180deg, rgba(205,180,255,.95), rgba(125,249,255,.9));
-      box-shadow: 0 0 10px rgba(205,180,255,.55);
+      background: linear-gradient(180deg, rgba(var(--accent-1),.95), rgba(var(--accent-2),.9));
+      box-shadow: 0 0 10px rgba(var(--accent-1),.55);
     }
 
     /* font preview swatches */
@@ -564,11 +761,11 @@
       transition: background .12s, border-color .12s;
       user-select: none;
     }
-    .fontSwatch:hover{ background: rgba(255,255,255,.12); border-color: rgba(205,180,255,.40); }
+    .fontSwatch:hover{ background: rgba(255,255,255,.12); border-color: rgba(var(--accent-1),.40); }
     .fontSwatch.sel{
-      background: rgba(205,180,255,.18);
-      border-color: rgba(205,180,255,.60);
-      box-shadow: 0 0 14px rgba(205,180,255,.22);
+      background: rgba(var(--accent-1),.18);
+      border-color: rgba(var(--accent-1),.60);
+      box-shadow: 0 0 14px rgba(var(--accent-1),.22);
     }
     /* ================================================================
        STREAM SEARCH UI
@@ -588,8 +785,8 @@
       transition: border-color .15s, box-shadow .15s;
     }
     #searchInput:focus{
-      border-color: rgba(205,180,255,.45);
-      box-shadow: 0 0 0 2px rgba(205,180,255,.10);
+      border-color: rgba(var(--accent-1),.45);
+      box-shadow: 0 0 0 2px rgba(var(--accent-1),.10);
     }
     #searchInput::placeholder{ color: rgba(255,255,255,.32); }
 
@@ -598,14 +795,14 @@
       cursor:pointer;
       padding: 9px 16px;
       border-radius: 12px;
-      border: 1px solid rgba(205,180,255,.32);
-      background: linear-gradient(180deg, rgba(205,180,255,.22), rgba(125,249,255,.10));
+      border: 1px solid rgba(var(--accent-1),.32);
+      background: linear-gradient(180deg, rgba(var(--accent-1),.22), rgba(var(--accent-2),.10));
       color: var(--text);
       font: inherit;
       white-space: nowrap;
       transition: background .15s;
     }
-    #searchBtn:hover{ background: linear-gradient(180deg, rgba(205,180,255,.34), rgba(125,249,255,.18)); }
+    #searchBtn:hover{ background: linear-gradient(180deg, rgba(var(--accent-1),.34), rgba(var(--accent-2),.18)); }
     #searchBtn:disabled{ opacity:.45; cursor:default; }
 
     #searchClearBtn{
@@ -646,10 +843,10 @@
       transition: background .12s, border-color .12s;
       user-select:none;
     }
-    .sResult:hover{ background: rgba(255,255,255,.09); border-color: rgba(205,180,255,.28); }
+    .sResult:hover{ background: rgba(255,255,255,.09); border-color: rgba(var(--accent-1),.28); }
     .sResult.active{
-      background: linear-gradient(180deg, rgba(205,180,255,.16), rgba(125,249,255,.06));
-      border-color: rgba(205,180,255,.42);
+      background: linear-gradient(180deg, rgba(var(--accent-1),.16), rgba(var(--accent-2),.06));
+      border-color: rgba(var(--accent-1),.42);
     }
     .sResult.errored{ opacity:.45; cursor:default; }
 
@@ -717,8 +914,8 @@
       line-height:1;
       transition: background .12s, color .12s, border-color .12s;
     }
-    .sQueueBtn:hover{ background: linear-gradient(180deg, rgba(205,180,255,.28), rgba(125,249,255,.12)); color: var(--text); border-color: rgba(205,180,255,.42); }
-    .sQueueBtn.queued{ color: rgba(255,255,255,.85); border-color: rgba(205,180,255,.35); }
+    .sQueueBtn:hover{ background: linear-gradient(180deg, rgba(var(--accent-1),.28), rgba(var(--accent-2),.12)); color: var(--text); border-color: rgba(var(--accent-1),.42); }
+    .sQueueBtn.queued{ color: rgba(255,255,255,.85); border-color: rgba(var(--accent-1),.35); }
 
     #searchStatus{
       font-size:10px;
@@ -736,8 +933,8 @@
       gap:8px;
       padding: 10px 12px;
       border-radius:14px;
-      border:1px solid rgba(205,180,255,.32);
-      background: linear-gradient(180deg, rgba(205,180,255,.16), rgba(125,249,255,.06));
+      border:1px solid rgba(var(--accent-1),.32);
+      background: linear-gradient(180deg, rgba(var(--accent-1),.16), rgba(var(--accent-2),.06));
       margin-bottom:2px;
     }
 
@@ -790,27 +987,27 @@
       width:34px;height:34px;
       display:flex;align-items:center;justify-content:center;
       border-radius:10px;
-      border:1px solid rgba(205,180,255,.32);
-      background: linear-gradient(180deg, rgba(205,180,255,.22), rgba(125,249,255,.10));
+      border:1px solid rgba(var(--accent-1),.32);
+      background: linear-gradient(180deg, rgba(var(--accent-1),.22), rgba(var(--accent-2),.10));
       color: var(--text);
       cursor:pointer;
       transition: background .14s, border-color .14s, transform .08s;
     }
     .transportBtn svg{ width:15px;height:15px; fill:currentColor; }
-    .transportBtn:hover{ background: linear-gradient(180deg, rgba(205,180,255,.34), rgba(125,249,255,.18)); border-color: rgba(205,180,255,.5); }
+    .transportBtn:hover{ background: linear-gradient(180deg, rgba(var(--accent-1),.34), rgba(var(--accent-2),.18)); border-color: rgba(var(--accent-1),.5); }
     .transportBtn:active{ transform: scale(.92); }
     .transportBtn:disabled{ opacity:.30; cursor:default; }
-    .transportBtn:disabled:hover{ background: linear-gradient(180deg, rgba(205,180,255,.22), rgba(125,249,255,.10)); border-color: rgba(205,180,255,.32); transform:none; }
+    .transportBtn:disabled:hover{ background: linear-gradient(180deg, rgba(var(--accent-1),.22), rgba(var(--accent-2),.10)); border-color: rgba(var(--accent-1),.32); transform:none; }
 
     /* play/pause is the primary action — slightly larger, filled */
     #playPauseBtn{
       width:42px;height:42px;
       border-radius:50%;
-      background: radial-gradient(circle at 35% 30%, rgba(205,180,255,.34), rgba(125,249,255,.12));
-      border-color: rgba(205,180,255,.5);
+      background: radial-gradient(circle at 35% 30%, rgba(var(--accent-1),.34), rgba(var(--accent-2),.12));
+      border-color: rgba(var(--accent-1),.5);
     }
     #playPauseBtn svg{ width:17px;height:17px; }
-    #playPauseBtn:hover{ background: radial-gradient(circle at 35% 30%, rgba(205,180,255,.46), rgba(125,249,255,.18)); }
+    #playPauseBtn:hover{ background: radial-gradient(circle at 35% 30%, rgba(var(--accent-1),.46), rgba(var(--accent-2),.18)); }
 
     /* volume — icon by default, expands to a slider on hover, scrollable.
        Pinned to the right edge of the transport row. */
@@ -823,8 +1020,8 @@
     #volumeBtn{
       width:30px;height:30px;
       border-radius:9px;
-      border:1px solid rgba(205,180,255,.32);
-      background: linear-gradient(180deg, rgba(205,180,255,.22), rgba(125,249,255,.10));
+      border:1px solid rgba(var(--accent-1),.32);
+      background: linear-gradient(180deg, rgba(var(--accent-1),.22), rgba(var(--accent-2),.10));
       color: var(--text);
       display:flex;align-items:center;justify-content:center;
       cursor:pointer;
@@ -833,7 +1030,7 @@
       transition: background .14s, border-color .14s;
     }
     #volumeBtn svg{ width:14px;height:14px; fill:currentColor; }
-    #volumeBtn:hover{ background: linear-gradient(180deg, rgba(205,180,255,.34), rgba(125,249,255,.18)); border-color: rgba(205,180,255,.5); }
+    #volumeBtn:hover{ background: linear-gradient(180deg, rgba(var(--accent-1),.34), rgba(var(--accent-2),.18)); border-color: rgba(var(--accent-1),.5); }
     #volPercentLabel{
       display:none;
       font-size:9px;
@@ -862,26 +1059,26 @@
       -webkit-appearance:none; appearance:none;
       height:5px;
       border-radius:999px;
-      background: linear-gradient(90deg, rgba(205,180,255,.30), rgba(125,249,255,.18));
+      background: linear-gradient(90deg, rgba(var(--accent-1),.30), rgba(var(--accent-2),.18));
       cursor:pointer;
       outline:none;
     }
     #volumeSlider::-webkit-slider-thumb{
       -webkit-appearance:none;
       width:11px;height:11px;border-radius:50%;
-      background: linear-gradient(180deg, rgba(205,180,255,.95), rgba(125,249,255,.9));
-      box-shadow:0 0 6px rgba(205,180,255,.7);
+      background: linear-gradient(180deg, rgba(var(--accent-1),.95), rgba(var(--accent-2),.9));
+      box-shadow:0 0 6px rgba(var(--accent-1),.7);
       cursor:pointer;
     }
     #volumeSlider::-moz-range-thumb{
       width:11px;height:11px;border-radius:50%;border:none;
-      background: linear-gradient(180deg, rgba(205,180,255,.95), rgba(125,249,255,.9));
-      box-shadow:0 0 6px rgba(205,180,255,.7);
+      background: linear-gradient(180deg, rgba(var(--accent-1),.95), rgba(var(--accent-2),.9));
+      box-shadow:0 0 6px rgba(var(--accent-1),.7);
       cursor:pointer;
     }
     #volumeSlider::-moz-range-track{
       height:5px; border-radius:999px;
-      background: linear-gradient(90deg, rgba(205,180,255,.30), rgba(125,249,255,.18));
+      background: linear-gradient(90deg, rgba(var(--accent-1),.30), rgba(var(--accent-2),.18));
     }
 
     /* seek row: elapsed — bar — total */
@@ -904,26 +1101,26 @@
       -webkit-appearance:none; appearance:none;
       height:11px;
       border-radius:999px;
-      background: linear-gradient(90deg, rgba(205,180,255,.30), rgba(125,249,255,.18));
+      background: linear-gradient(90deg, rgba(var(--accent-1),.30), rgba(var(--accent-2),.18));
       cursor:pointer;
       outline:none;
     }
     #seekBar::-webkit-slider-thumb{
       -webkit-appearance:none;
       width:11px;height:11px;border-radius:50%;
-      background: linear-gradient(180deg, rgba(205,180,255,.95), rgba(125,249,255,.9));
-      box-shadow:0 0 6px rgba(205,180,255,.7);
+      background: linear-gradient(180deg, rgba(var(--accent-1),.95), rgba(var(--accent-2),.9));
+      box-shadow:0 0 6px rgba(var(--accent-1),.7);
       cursor:pointer;
     }
     #seekBar::-moz-range-thumb{
       width:11px;height:11px;border-radius:50%;border:none;
-      background: linear-gradient(180deg, rgba(205,180,255,.95), rgba(125,249,255,.9));
-      box-shadow:0 0 6px rgba(205,180,255,.7);
+      background: linear-gradient(180deg, rgba(var(--accent-1),.95), rgba(var(--accent-2),.9));
+      box-shadow:0 0 6px rgba(var(--accent-1),.7);
       cursor:pointer;
     }
     #seekBar::-moz-range-track{
       height:11px; border-radius:999px;
-      background: linear-gradient(90deg, rgba(205,180,255,.30), rgba(125,249,255,.18));
+      background: linear-gradient(90deg, rgba(var(--accent-1),.30), rgba(var(--accent-2),.18));
     }
 
     /* up-next queue panel */
@@ -945,7 +1142,7 @@
       padding: 0 2px;
     }
     #queueLabel .radioTag{
-      color:rgba(205,180,255,.65);
+      color:rgba(var(--accent-1),.65);
     }
     #queueLabelBtns{
       display:flex;
@@ -1031,7 +1228,7 @@
         0 22px 80px rgba(0,0,0,.55),
         0 0 0 1px rgba(0,0,0,.35) inset,
         0 0 48px rgba(255,130,180,.22),
-        0 0 28px rgba(205,180,255,.18);
+        0 0 28px rgba(var(--accent-1),.18);
       backdrop-filter: blur(20px);
       background:
         radial-gradient(120% 160% at 50% 0%, rgba(255,255,255,.10), rgba(0,0,0,0) 55%),
@@ -1129,7 +1326,7 @@
       transition: color .12s, background .12s;
     }
     .qItem .qPlay svg{ width:9px;height:9px; fill:currentColor; }
-    .qItem .qPlay:hover{ color: var(--text); background: linear-gradient(180deg, rgba(205,180,255,.28), rgba(125,249,255,.12)); }
+    .qItem .qPlay:hover{ color: var(--text); background: linear-gradient(180deg, rgba(var(--accent-1),.28), rgba(var(--accent-2),.12)); }
     .qItem .qTitle{
       flex:1; min-width:0;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
@@ -1156,314 +1353,392 @@
 <body>
   <div id="crtFrame"></div>
 
+  <!-- ================================================================
+       NEW MORPHING PILL HUD
+  ================================================================ -->
   <div id="hud">
-    <div id="hudTop">
-      <div class="left">
-        <b>CRT // AUDIO SCULPTURES</b>
-        <div class="pillRow">
-          <span class="pill" id="statusPill"><span class="dot"></span><span id="statusText">idle</span></span>
-          <span class="pill" title="Randomized descriptor (updates on Randomize/Reset)">
-            <span class="k">preset</span>
-            <span id="presetText">DEFAULT</span>
-          </span>
+    <div class="pill-row">
+
+      <!-- LEFT WING: prev / play-pause / next -->
+      <div class="wing wing-left" id="wL">
+        <div class="hide-when-closed">
+          <button class="ctrl-btn" id="prevBtn" type="button" title="Previous" disabled>
+            <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zM20 6 10 12l10 6z"/></svg>
+          </button>
+        </div>
+        <button class="ctrl-btn" id="playPauseBtn" type="button" title="Play/Pause">
+          <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="pauseIcon" viewBox="0 0 24 24" style="display:none;"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>
+        </button>
+        <div class="hide-when-closed">
+          <button class="ctrl-btn" id="nextBtn" type="button" title="Next" disabled>
+            <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM4 6l10 6-10 6z"/></svg>
+          </button>
         </div>
       </div>
-      <button id="hudToggle" class="secondary" type="button">MINIMIZE</button>
-    </div>
 
-    <div id="hudBody">
-      <details class="group collapsible" id="sectionPlayback" data-section="playback">
-        <summary class="groupSummary">Playback &amp; Search</summary>
-        <div class="groupContent" style="min-width:min(560px,100%);">
+      <!-- THE MORPH: pill → expanded settings card -->
+      <div class="morph" id="morph">
 
-        <!-- Stream search -->
-        <div id="searchBox">
-          <input id="searchInput" type="text" placeholder="Search for a song or artist…" autocomplete="off" spellcheck="false" />
-          <button id="searchClearBtn" type="button" title="Clear results" style="display:none;">✕</button>
-          <button id="searchBtn" type="button">Search</button>
+        <!-- ── PILL SEEK (fill + scrub behind content) ── -->
+        <div class="pill-seek-wrap">
+          <div class="pill-seek-fill" id="pillSeekFill"></div>
+        </div>
+        <input type="range" class="pill-seek-scrub" id="pillSeekScrub" min="0" max="100" step="0.1" value="0" />
+
+        <!-- ── PILL FACE (collapsed) ── -->
+        <div class="pill-content">
+          <div class="art-sm" id="pillArt">
+            <img id="pillThumb" src="" alt="" style="display:none;" />
+          </div>
+          <div class="pill-track">
+            <div class="t-artist" id="pillArtist">CRT // AUDIO SCULPTURES</div>
+            <div class="t-title" id="pillTitle">happy visualizing</div>
+          </div>
+          <button class="icon-btn" id="cogBtn" aria-label="Settings">
+            <svg class="cog-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            <svg class="cross-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
         </div>
 
-        <!-- Results list -->
-        <div id="searchResults"></div>
-
-        <!-- Unified player: now-playing + transport + seek + volume -->
-        <div id="playerCard">
-          <div id="nowPlayingBar">
-            <img id="nowPlayingThumb" src="" alt="" />
-            <div id="nowPlayingMeta">
-              <div id="nowPlayingTitle">—</div>
-              <div id="nowPlayingArtist">—</div>
-            </div>
-            <span id="searchStatus"></span>
-          </div>
-
-          <div id="transportRow">
-            <div id="transportSpacer" aria-hidden="true"></div>
-            <div id="transportCenter">
-              <button id="prevBtn" class="transportBtn" type="button" title="Previous">
-                <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zM20 6 10 12l10 6z"/></svg>
-              </button>
-              <button id="playPauseBtn" class="transportBtn" type="button" title="Play/Pause">
-                <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                <svg id="pauseIcon" viewBox="0 0 24 24" style="display:none;"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>
-              </button>
-              <button id="nextBtn" class="transportBtn" type="button" title="Next">
-                <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM4 6l10 6-10 6z"/></svg>
-              </button>
-            </div>
-
-            <div id="volumeControl">
-              <button id="volumeBtn" type="button" title="Mute/Unmute (scroll to adjust)">
-                <svg id="volIconHigh" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-                <svg id="volIconMuted" viewBox="0 0 24 24" style="display:none;"><path d="M16.5 12A4.5 4.5 0 0 0 14 8v1.79l2.48 2.48zM19 12c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.42 8.42 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.99 8.99 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18z"/></svg>
-                <span id="volPercentLabel"></span>
-              </button>
-              <div id="volumeSliderWrap">
-                <input id="volumeSlider" type="range" min="0" max="100" step="1" value="100" />
+        <!-- ── CARD FACE (expanded) ── -->
+        <div class="card-content">
+          <!-- top bar -->
+          <div class="card-top">
+            <div class="card-title-area">
+              <b>CRT // AUDIO SCULPTURES</b>
+              <div class="pillRow">
+                <span class="pill" id="statusPill"><span class="dot"></span><span id="statusText">idle</span></span>
+                <span class="pill" title="Randomized descriptor">
+                  <span class="k">preset</span>
+                  <span id="presetText">DEFAULT</span>
+                </span>
               </div>
             </div>
+            <button class="icon-btn" id="closeBtn" aria-label="Close settings">
+              <svg style="position:relative;opacity:1;transform:none;width:22px;height:22px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
           </div>
 
-          <div id="seekRow">
-            <span id="seekTime">0:00</span>
-            <input id="seekBar" type="range" min="0" max="100" step="0.1" value="0" />
-            <span id="seekDuration">0:00</span>
-          </div>
+          <!-- scrollable settings body -->
+          <div id="hudBody">
+
+            <details class="group collapsible" id="sectionPlayback" data-section="playback" open>
+              <summary class="groupSummary">Playback &amp; Search</summary>
+              <div class="groupContent" style="min-width:min(560px,100%);">
+
+              <!-- Stream search -->
+              <div id="searchBox">
+                <input id="searchInput" type="text" placeholder="Search for a song or artist…" autocomplete="off" spellcheck="false" />
+                <button id="searchClearBtn" type="button" title="Clear results" style="display:none;">✕</button>
+                <button id="searchBtn" type="button">Search</button>
+              </div>
+
+              <!-- Results list -->
+              <div id="searchResults"></div>
+
+              <!-- Unified player: now-playing + transport + seek + volume -->
+              <div id="playerCard">
+                <div id="nowPlayingBar">
+                  <img id="nowPlayingThumb" src="" alt="" />
+                  <div id="nowPlayingMeta">
+                    <div id="nowPlayingTitle">—</div>
+                    <div id="nowPlayingArtist">—</div>
+                  </div>
+                  <span id="searchStatus"></span>
+                </div>
+
+                <div id="transportRow">
+                  <div id="transportSpacer" aria-hidden="true"></div>
+                  <div id="transportCenter">
+                    <button id="prevBtnCard" class="transportBtn" type="button" title="Previous">
+                      <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zM20 6 10 12l10 6z"/></svg>
+                    </button>
+                    <button id="playPauseBtnCard" class="transportBtn" type="button" title="Play/Pause">
+                      <svg id="playIconCard" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                      <svg id="pauseIconCard" viewBox="0 0 24 24" style="display:none;"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>
+                    </button>
+                    <button id="nextBtnCard" class="transportBtn" type="button" title="Next">
+                      <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM4 6l10 6-10 6z"/></svg>
+                    </button>
+                  </div>
+
+                  <div id="volumeControl">
+                    <button id="volumeBtn" type="button" title="Mute/Unmute (scroll to adjust)">
+                      <svg id="volIconHigh" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                      <svg id="volIconMuted" viewBox="0 0 24 24" style="display:none;"><path d="M16.5 12A4.5 4.5 0 0 0 14 8v1.79l2.48 2.48zM19 12c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.42 8.42 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.99 8.99 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18z"/></svg>
+                      <span id="volPercentLabel"></span>
+                    </button>
+                    <div id="volumeSliderWrap">
+                      <input id="volumeSlider" type="range" min="0" max="100" step="1" value="100" />
+                    </div>
+                  </div>
+                </div>
+
+                <div id="seekRow">
+                  <span id="seekTime">0:00</span>
+                  <input id="seekBar" type="range" min="0" max="100" step="0.1" value="0" />
+                  <span id="seekDuration">0:00</span>
+                </div>
+              </div>
+
+              <!-- Up-next queue -->
+              <div id="queuePanel"></div>
+
+              <!-- Divider -->
+              <div style="width:100%;height:1px;background:rgba(255,255,255,.08);margin:2px 0;"></div>
+
+              <!-- Local file fallback -->
+              <label class="fileLabel">
+                Local file (fallback)
+                <input id="file" type="file" accept="audio/*" />
+              </label>
+
+              <div class="hint">
+                Search streams via YouTube. Some tracks may be unavailable.
+              </div>
+              </div>
+            </details>
+
+            <details class="group collapsible" id="sectionShape" data-section="shape">
+              <summary class="groupSummary">Shape &amp; Style</summary>
+              <div class="groupContent">
+              <label>
+                Shape
+                <select id="shape">
+                  <option value="sphere">Sphere</option>
+                  <option value="ico">Icosa</option>
+                  <option value="dodeca">Dodeca</option>
+                  <option value="tetra">Tetra</option>
+                  <option value="octa">Octa</option>
+                  <option value="box">Box</option>
+                  <option value="cylinder">Cylinder</option>
+                  <option value="torus">Torus</option>
+                  <option value="knot">Knot</option>
+                  <option value="capsule">Capsule</option>
+                  <option value="cone">Cone</option>
+                  <option value="cover" selected>Cover Art</option>
+                </select>
+              </label>
+
+              <label>
+                Style (deform)
+                <select id="deformMode">
+                  <option value="liquid">Liquid</option>
+                  <option value="ripple">Ripple</option>
+                  <option value="aurora">Aurora Bands</option>
+                  <option value="halo">Halo Pulse</option>
+                  <option value="twist">Twist</option>
+                  <option value="orbit">Orbit Blobs</option>
+                  <option value="moire">Moire Interference</option>
+                  <option value="scan">Scan Sweep</option>
+                  <option value="vortex">Vortex</option>
+                  <option value="crinkle">Crinkle</option>
+                  <option value="chatter">Chatter</option>
+                  <option value="breath" selected>Breath</option>
+                </select>
+              </label>
+
+              <label>
+                Detail (rebuild)
+                <select id="detail">
+                  <option value="3">Low</option>
+                  <option value="4">Medium</option>
+                  <option value="5">High</option>
+                  <option value="6" selected>Ultra</option>
+                </select>
+              </label>
+
+              <label style="flex-direction:row;align-items:center;gap:10px;min-width:140px">
+                <input id="wireframe" type="checkbox" />
+                <span style="color:var(--muted);font-size:11px">Wireframe</span>
+              </label>
+              </div>
+            </details>
+
+            <details class="group collapsible" id="sectionColors" data-section="colors">
+              <summary class="groupSummary">Colors</summary>
+              <div class="groupContent">
+              <label>
+                Sculpture color
+                <input id="sculptColor" type="color" value="#cdb4ff" />
+              </label>
+              <label>
+                Glow color
+                <input id="glowColor" type="color" value="#7df9ff" />
+              </label>
+              <label>
+                Background
+                <input id="bgColor" type="color" value="#07061a" />
+              </label>
+              <div style="display:flex;flex-direction:column;gap:6px;justify-content:flex-end;">
+                <button id="rgbBtn" type="button" title="Toggle RGB override mode">RGB</button>
+                <span id="colorAdaptPill" title="Adaptive color — auto-extracted from album art / genre">
+                  <span id="colorAdaptDot"></span>
+                  <span id="colorAdaptText">color adapt</span>
+                </span>
+              </div>
+              </div>
+            </details>
+
+            <details class="group collapsible" id="sectionReactivity" data-section="reactivity">
+              <summary class="groupSummary">Audio Reactivity</summary>
+              <div class="groupContent">
+              <label>
+                Sensitivity <span id="sensV" style="color:rgba(255,255,255,.75)"></span>
+                <input id="sensitivity" type="range" min="0.6" max="4.0" step="0.05" value="1.40" />
+              </label>
+
+              <label>
+                Smoothing <span id="smoothV" style="color:rgba(255,255,255,.75)"></span>
+                <input id="smoothing" type="range" min="0" max="0.95" step="0.01" value="0.50" />
+              </label>
+
+              <label>
+                Displacement
+                <input id="displacement" type="range" min="0" max="2.5" step="0.01" value="1.25" />
+              </label>
+
+              <label>
+                Rotation speed
+                <input id="rotSpeed" type="range" min="0" max="1.6" step="0.01" value="1.20" />
+              </label>
+              </div>
+            </details>
+
+            <details class="group collapsible" id="sectionEffects" data-section="effects">
+              <summary class="groupSummary">Effects &amp; CRT</summary>
+              <div class="groupContent">
+              <label>
+                Particles
+                <input id="particles" type="range" min="0" max="1" step="0.01" value="1.00" />
+              </label>
+
+              <label>
+                Bloom (capped)
+                <input id="bloomAmt" type="range" min="0" max="1.7" step="0.01" value="0.595" />
+              </label>
+
+              <label>
+                Motion blur (trails)
+                <input id="motionBlur" type="range" min="0" max="0.98" step="0.01" value="0" />
+              </label>
+
+              <label>
+                CRT intensity
+                <input id="crtIntensity" type="range" min="0" max="1" step="0.01" value="0" />
+              </label>
+
+              <label>
+                Roundness X
+                <input id="roundX" type="range" min="0" max="0.36" step="0.001" value="0" />
+              </label>
+
+              <label>
+                Roundness Y
+                <input id="roundY" type="range" min="0" max="0.36" step="0.001" value="0" />
+              </label>
+
+              <label style="flex-direction:row;align-items:center;gap:10px;min-width:180px">
+                <input id="crtJitter" type="checkbox" />
+                <span style="color:var(--muted);font-size:11px">V-Hold jitter</span>
+              </label>
+
+              <div class="rowBtns" style="min-width:320px;">
+                <button id="randomize" type="button">Randomize</button>
+                <button id="reset" class="secondary" type="button">Reset</button>
+              </div>
+              </div>
+            </details>
+
+            <!-- ======== LYRICS PANEL ======== -->
+            <details class="group collapsible" id="lyricsGroup" data-section="lyrics" style="min-width:min(100%,640px);">
+              <summary class="groupSummary">Lyrics</summary>
+              <div class="groupContent">
+
+              <div style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                <b style="font-size:12px;font-family:ui-monospace,monospace;color:rgba(255,255,255,.85);">LYRICS</b>
+                <div id="lyricsStatus">idle</div>
+                <label style="flex-direction:row;align-items:center;gap:8px;min-width:auto;">
+                  <input id="lyricsToggle" type="checkbox" checked />
+                  <span style="color:var(--muted);font-size:11px;white-space:nowrap">Show lyrics</span>
+                </label>
+              </div>
+
+              <div class="rowBtns" style="min-width:100%;">
+                <input id="lyricsArtist" type="text" placeholder="Artist (auto-detected from filename)" style="flex:1;min-width:0;" />
+                <input id="lyricsTitle"  type="text" placeholder="Title (auto-detected from filename)"  style="flex:1;min-width:0;" />
+                <button id="lyricsFetch" type="button" style="flex:0 0 auto;min-width:90px;">Fetch</button>
+              </div>
+
+              <div style="width:100%;">
+                <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Font</div>
+                <div id="fontSwatches" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+              </div>
+
+              <label style="min-width:120px;">
+                Lyrics color
+                <input id="lyricsColor" type="color" value="#ffffff" />
+              </label>
+              <label style="min-width:120px;">
+                Glow tint
+                <input id="lyricsGlow" type="color" value="#cdb4ff" />
+              </label>
+
+              <label>
+                Font size <span id="lyricsSizeV" style="color:rgba(255,255,255,.75)">36</span>px
+                <input id="lyricsSize" type="range" min="12" max="180" step="1" value="36" />
+              </label>
+              <label>
+                Stretch X <span id="lyricsScaleXV" style="color:rgba(255,255,255,.75)">1.00</span>
+                <input id="lyricsScaleX" type="range" min="0.30" max="3.00" step="0.01" value="1.00" />
+              </label>
+              <label>
+                Stretch Y <span id="lyricsScaleYV" style="color:rgba(255,255,255,.75)">1.00</span>
+                <input id="lyricsScaleY" type="range" min="0.30" max="3.00" step="0.01" value="1.00" />
+              </label>
+
+              <label>
+                Opacity <span id="lyricsOpacityV" style="color:rgba(255,255,255,.75)">0.85</span>
+                <input id="lyricsOpacity" type="range" min="0.10" max="1.00" step="0.01" value="0.85" />
+              </label>
+
+              <div class="hint">
+                Synced LRC only. Sources (tried in order): <b>lrclib.net</b> → <b>Netease</b> → <b>QQ Music</b> (via Meting API). Auto-fetch on file load from <code>Artist - Title.mp3</code>. For best results, open this page through a local server (<code>npx serve</code>) instead of double-clicking the HTML file.
+              </div>
+              </div>
+            </details>
+
+          </div><!-- /#hudBody -->
+        </div><!-- /.card-content -->
+      </div><!-- /.morph -->
+
+      <!-- RIGHT WING: volume -->
+      <div class="wing wing-right" id="wR">
+        <div class="vol-wrap">
+          <div class="vol-fill" id="volFill"></div>
         </div>
-
-        <!-- Up-next queue -->
-        <div id="queuePanel"></div>
-
-        <!-- Divider -->
-        <div style="width:100%;height:1px;background:rgba(255,255,255,.08);margin:2px 0;"></div>
-
-        <!-- Local file fallback -->
-        <label class="fileLabel">
-          Local file (fallback)
-          <input id="file" type="file" accept="audio/*" />
-        </label>
-
-        <div class="hint">
-          Search streams via YouTube. Some tracks may be unavailable. Press <b>M</b> to minimize/expand.
+        <div class="vol-center">
+          <span class="vol-pct" id="volPct">100%</span>
+          <button class="mute-btn" id="muteBtn" aria-label="Mute">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </svg>
+          </button>
         </div>
-        </div>
-      </details>
+        <input type="range" class="vol-scrub" id="volScrub" min="0" max="100" value="100" step="1">
+      </div>
 
-      <details class="group collapsible" id="sectionShape" data-section="shape">
-        <summary class="groupSummary">Shape &amp; Style</summary>
-        <div class="groupContent">
-        <label>
-          Shape
-          <select id="shape">
-            <option value="sphere">Sphere</option>
-            <option value="ico">Icosa</option>
-            <option value="dodeca">Dodeca</option>
-            <option value="tetra">Tetra</option>
-            <option value="octa">Octa</option>
-            <option value="box">Box</option>
-            <option value="cylinder">Cylinder</option>
-            <option value="torus">Torus</option>
-            <option value="knot">Knot</option>
-            <option value="capsule">Capsule</option>
-            <option value="cone">Cone</option>
-            <option value="cover" selected>Cover Art</option>
-          </select>
-        </label>
-
-        <label>
-          Style (deform)
-          <select id="deformMode">
-            <option value="liquid">Liquid</option>
-            <option value="ripple">Ripple</option>
-            <option value="aurora">Aurora Bands</option>
-            <option value="halo">Halo Pulse</option>
-            <option value="twist">Twist</option>
-            <option value="orbit">Orbit Blobs</option>
-            <option value="moire">Moire Interference</option>
-            <option value="scan">Scan Sweep</option>
-            <option value="vortex">Vortex</option>
-            <option value="crinkle">Crinkle</option>
-            <option value="chatter">Chatter</option>
-            <option value="breath" selected>Breath</option>
-          </select>
-        </label>
-
-        <label>
-          Detail (rebuild)
-          <select id="detail">
-            <option value="3">Low</option>
-            <option value="4">Medium</option>
-            <option value="5">High</option>
-            <option value="6" selected>Ultra</option>
-          </select>
-        </label>
-
-        <label style="flex-direction:row;align-items:center;gap:10px;min-width:140px">
-          <input id="wireframe" type="checkbox" />
-          <span style="color:var(--muted);font-size:11px">Wireframe</span>
-        </label>
-        </div>
-      </details>
-
-      <details class="group collapsible" id="sectionColors" data-section="colors">
-        <summary class="groupSummary">Colors</summary>
-        <div class="groupContent">
-        <label>
-          Sculpture color
-          <input id="sculptColor" type="color" value="#cdb4ff" />
-        </label>
-        <label>
-          Glow color
-          <input id="glowColor" type="color" value="#7df9ff" />
-        </label>
-        <label>
-          Background
-          <input id="bgColor" type="color" value="#07061a" />
-        </label>
-        <div style="display:flex;flex-direction:column;gap:6px;justify-content:flex-end;">
-          <button id="rgbBtn" type="button" title="Toggle RGB override mode">RGB</button>
-          <span id="colorAdaptPill" title="Adaptive color — auto-extracted from album art / genre">
-            <span id="colorAdaptDot"></span>
-            <span id="colorAdaptText">color adapt</span>
-          </span>
-        </div>
-        </div>
-      </details>
-
-      <details class="group collapsible" id="sectionReactivity" data-section="reactivity">
-        <summary class="groupSummary">Audio Reactivity</summary>
-        <div class="groupContent">
-        <label>
-          Sensitivity <span id="sensV" style="color:rgba(255,255,255,.75)"></span>
-          <input id="sensitivity" type="range" min="0.6" max="4.0" step="0.05" value="1.40" />
-        </label>
-
-        <label>
-          Smoothing <span id="smoothV" style="color:rgba(255,255,255,.75)"></span>
-          <input id="smoothing" type="range" min="0" max="0.95" step="0.01" value="0.50" />
-        </label>
-
-        <label>
-          Displacement
-          <input id="displacement" type="range" min="0" max="2.5" step="0.01" value="1.25" />
-        </label>
-
-        <label>
-          Rotation speed
-          <input id="rotSpeed" type="range" min="0" max="1.6" step="0.01" value="1.20" />
-        </label>
-        </div>
-      </details>
-
-      <details class="group collapsible" id="sectionEffects" data-section="effects">
-        <summary class="groupSummary">Effects &amp; CRT</summary>
-        <div class="groupContent">
-        <label>
-          Particles
-          <input id="particles" type="range" min="0" max="1" step="0.01" value="1.00" />
-        </label>
-
-        <label>
-          Bloom (capped)
-          <input id="bloomAmt" type="range" min="0" max="1.7" step="0.01" value="0.595" />
-        </label>
-
-        <label>
-          Motion blur (trails)
-          <input id="motionBlur" type="range" min="0" max="0.98" step="0.01" value="0" />
-        </label>
-
-        <label>
-          CRT intensity
-          <input id="crtIntensity" type="range" min="0" max="1" step="0.01" value="0" />
-        </label>
-
-        <label>
-          Roundness X
-          <input id="roundX" type="range" min="0" max="0.36" step="0.001" value="0" />
-        </label>
-
-        <label>
-          Roundness Y
-          <input id="roundY" type="range" min="0" max="0.36" step="0.001" value="0" />
-        </label>
-
-        <label style="flex-direction:row;align-items:center;gap:10px;min-width:180px">
-          <input id="crtJitter" type="checkbox" />
-          <span style="color:var(--muted);font-size:11px">V-Hold jitter</span>
-        </label>
-
-        <div class="rowBtns" style="min-width: 320px;">
-          <button id="randomize" type="button">Randomize</button>
-          <button id="reset" class="secondary" type="button">Reset</button>
-        </div>
-        </div>
-      </details>
-
-      <!-- ======== LYRICS PANEL ======== -->
-      <details class="group collapsible" id="lyricsGroup" data-section="lyrics" style="min-width:min(100%,640px);">
-        <summary class="groupSummary">Lyrics</summary>
-        <div class="groupContent">
-
-        <!-- header row -->
-        <div style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-          <b style="font-size:12px;font-family:ui-monospace,monospace;color:rgba(255,255,255,.85);">LYRICS</b>
-          <div id="lyricsStatus">idle</div>
-          <label style="flex-direction:row;align-items:center;gap:8px;min-width:auto;">
-            <input id="lyricsToggle" type="checkbox" checked />
-            <span style="color:var(--muted);font-size:11px;white-space:nowrap">Show lyrics</span>
-          </label>
-        </div>
-
-        <!-- song info (auto-filled from filename, editable) -->
-        <div class="rowBtns" style="min-width:100%;">
-          <input id="lyricsArtist" type="text" placeholder="Artist (auto-detected from filename)" style="flex:1;min-width:0;" />
-          <input id="lyricsTitle"  type="text" placeholder="Title (auto-detected from filename)"  style="flex:1;min-width:0;" />
-          <button id="lyricsFetch" type="button" style="flex:0 0 auto;min-width:90px;">Fetch</button>
-        </div>
-
-        <!-- font selector -->
-        <div style="width:100%;">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Font</div>
-          <div id="fontSwatches" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-        </div>
-
-        <!-- colour -->
-        <label style="min-width:120px;">
-          Lyrics color
-          <input id="lyricsColor" type="color" value="#ffffff" />
-        </label>
-        <label style="min-width:120px;">
-          Glow tint
-          <input id="lyricsGlow" type="color" value="#cdb4ff" />
-        </label>
-
-        <!-- size & stretch -->
-        <label>
-          Font size <span id="lyricsSizeV" style="color:rgba(255,255,255,.75)">36</span>px
-          <input id="lyricsSize" type="range" min="12" max="180" step="1" value="36" />
-        </label>
-        <label>
-          Stretch X <span id="lyricsScaleXV" style="color:rgba(255,255,255,.75)">1.00</span>
-          <input id="lyricsScaleX" type="range" min="0.30" max="3.00" step="0.01" value="1.00" />
-        </label>
-        <label>
-          Stretch Y <span id="lyricsScaleYV" style="color:rgba(255,255,255,.75)">1.00</span>
-          <input id="lyricsScaleY" type="range" min="0.30" max="3.00" step="0.01" value="1.00" />
-        </label>
-
-        <label>
-          Opacity <span id="lyricsOpacityV" style="color:rgba(255,255,255,.75)">0.85</span>
-          <input id="lyricsOpacity" type="range" min="0.10" max="1.00" step="0.01" value="0.85" />
-        </label>
-
-        <div class="hint">
-          Synced LRC only. Sources (tried in order): <b>lrclib.net</b> → <b>Netease</b> → <b>QQ Music</b> (via Meting API). Auto-fetch on file load from <code>Artist - Title.mp3</code>. For best results, open this page through a local server (<code>npx serve</code>) instead of double-clicking the HTML file.
-        </div>
-        </div>
-      </details>
-    </div>
-  </div>
+    </div><!-- /.pill-row -->
+  </div><!-- /#hud -->
 
   <!-- LYRICS OVERLAY STAGE -->
   <div id="lyricsStage">
@@ -1505,7 +1780,6 @@
     // ---------------- UI ----------------
     const crtFrame = document.getElementById("crtFrame");
     const hud = document.getElementById("hud");
-    const hudToggle = document.getElementById("hudToggle");
 
     const statusPill = document.getElementById("statusPill");
     const statusText = document.getElementById("statusText");
@@ -1518,9 +1792,15 @@
     const volPercentLabel = document.getElementById("volPercentLabel");
     const volIconHigh = document.getElementById("volIconHigh");
     const volIconMuted = document.getElementById("volIconMuted");
+
+    // Wing play/pause (outside the pill) — treated as the primary playPauseBtn
     const playPauseBtn = document.getElementById("playPauseBtn");
-    const playIcon = document.getElementById("playIcon");
-    const pauseIcon = document.getElementById("pauseIcon");
+    const playIcon     = document.getElementById("playIcon");
+    const pauseIcon    = document.getElementById("pauseIcon");
+    // Card transport mirrors (inside expanded panel)
+    const playPauseBtnCard = document.getElementById("playPauseBtnCard");
+    const playIconCard     = document.getElementById("playIconCard");
+    const pauseIconCard    = document.getElementById("pauseIconCard");
 
     const shapeEl = document.getElementById("shape");
     const deformModeEl = document.getElementById("deformMode");
@@ -1557,49 +1837,139 @@
       statusPill.classList.toggle("on", on);
     }
 
-    // minimize
-    const HUD_MIN_KEY = "crt_audio_sculptures_hud_min_v1";
-    function setMinimized(min, save=true){
-      hud.classList.toggle("min", !!min);
-      hudToggle.textContent = min ? "EXPAND" : "MINIMIZE";
-      document.documentElement.style.setProperty("--tiltY", "0deg");
-      document.documentElement.style.setProperty("--tiltX", "0deg");
-      if (save) { try { localStorage.setItem(HUD_MIN_KEY, min ? "1" : "0"); } catch(_){} }
+    // ── MORPH PILL: expand / collapse ──
+    const morph   = document.getElementById("morph");
+    const cogBtn  = document.getElementById("cogBtn");
+    const closeBtn= document.getElementById("closeBtn");
+    const wL      = document.getElementById("wL");
+    const wR      = document.getElementById("wR");
+
+    function expandMorph() {
+      const startW = morph.offsetWidth;
+      const startH = morph.offsetHeight;
+      const targetW = morph.closest(".pill-row").offsetWidth;
+
+      // Measure content by briefly making card-content layout-visible
+      const cardContent = morph.querySelector(".card-content");
+      morph.style.transition = "none";
+      morph.style.overflow = "visible";
+      cardContent.style.position = "relative";
+      cardContent.style.opacity = "0";
+      cardContent.style.transform = "none";
+      cardContent.style.width = targetW + "px";
+      const naturalH = cardContent.scrollHeight;
+      cardContent.style.position = "";
+      cardContent.style.opacity = "";
+      cardContent.style.transform = "";
+      cardContent.style.width = "";
+      morph.style.overflow = "";
+
+      const targetH = Math.min(naturalH + 0, window.innerHeight - 95);
+
+      morph.style.width = startW + "px";
+      morph.style.height = startH + "px";
+      morph.classList.add("expanded");
+      morph.getBoundingClientRect();
+      morph.style.transition = "";
+      morph.style.width = targetW + "px";
+      morph.style.height = targetH + "px";
     }
-    hudToggle.addEventListener("click", () => setMinimized(!hud.classList.contains("min")));
+
+    function collapseMorph() {
+      morph.style.width = morph.offsetWidth + "px";
+      morph.style.height = morph.offsetHeight + "px";
+      morph.classList.remove("expanded");
+      morph.getBoundingClientRect();
+      morph.style.transition = "";
+      morph.style.width = "500px";
+      morph.style.height = "88px";
+
+      morph.addEventListener("transitionend", () => {
+        morph.style.width = "";
+        morph.style.height = "";
+      }, { once: true });
+    }
+
+    cogBtn.addEventListener("click", expandMorph);
+    closeBtn.addEventListener("click", collapseMorph);
+    // ESC closes card
     addEventListener("keydown", (e) => {
-      if (e.key.toLowerCase() !== "m") return;
-      const tag = document.activeElement?.tagName.toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") return;
-      setMinimized(!hud.classList.contains("min"));
+      if (e.key === "Escape" && morph.classList.contains("expanded")) {
+        collapseMorph();
+      }
     });
 
-    const isMobileHud = () => window.matchMedia("(max-width: 560px)").matches;
+    // Wings: hover to open after short delay, close quickly on leave
+    let tL, tR;
+    wL.addEventListener("mouseenter", () => { clearTimeout(tL); tL = setTimeout(() => wL.classList.add("open"), 2500); });
+    wL.addEventListener("mouseleave", () => { clearTimeout(tL); tL = setTimeout(() => wL.classList.remove("open"), 300); });
+    wR.addEventListener("mouseenter", () => { clearTimeout(tR); tR = setTimeout(() => wR.classList.add("open"), 2500); });
+    wR.addEventListener("mouseleave", () => { clearTimeout(tR); tR = setTimeout(() => wR.classList.remove("open"), 300); });
 
-    // cursor tilt (clamped so it never flips) — disabled on mobile to keep HUD centered
+    // ── WING VOLUME: scrub fills left wing's right vol display ──
+    const volFill = document.getElementById("volFill");
+    const volPct  = document.getElementById("volPct");
+    const muteBtn = document.getElementById("muteBtn");
+    const volScrub= document.getElementById("volScrub");
+
+    let wingMuted = false, wingLastVol = 100;
+
+    function setWingVol(v) {
+      volFill.style.width = v + "%";
+      volPct.textContent  = v + "%";
+      // also sync the card's volume slider + audio
+      if (volumeSlider) {
+        volumeSlider.value = v;
+        volumeSlider.dispatchEvent(new Event("input"));
+      }
+    }
+    setWingVol(100);
+
+    volScrub.addEventListener("input", () => {
+      const v = +volScrub.value;
+      if (v > 0) wingLastVol = v;
+      setWingVol(v);
+      if (wingMuted && v > 0) wingMuted = false;
+    });
+
+    muteBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      wingMuted = !wingMuted;
+      if (wingMuted) { volScrub.value = 0; setWingVol(0); }
+      else           { volScrub.value = wingLastVol; setWingVol(wingLastVol); }
+    });
+
+    // ── MIRROR: card play/pause → wing play/pause state ──
+    function syncPlayIcons(playing) {
+      // wing
+      if (playIcon)  playIcon.style.display  = playing ? "none" : "";
+      if (pauseIcon) pauseIcon.style.display = playing ? "" : "none";
+      // card
+      if (playIconCard)  playIconCard.style.display  = playing ? "none" : "";
+      if (pauseIconCard) pauseIconCard.style.display = playing ? "" : "none";
+    }
+
+    // Card transport prev/next mirror wing buttons
+    const prevBtnCard = document.getElementById("prevBtnCard");
+    const nextBtnCard = document.getElementById("nextBtnCard");
+
+    // ── PILL NOW-PLAYING display ──
+    function updatePillNowPlaying(title, artist, thumbSrc) {
+      const pillTitle  = document.getElementById("pillTitle");
+      const pillArtist = document.getElementById("pillArtist");
+      const pillThumb  = document.getElementById("pillThumb");
+      if (pillTitle)  pillTitle.textContent  = title  || "idle";
+      if (pillArtist) pillArtist.textContent = artist || "CRT // AUDIO SCULPTURES";
+      if (pillThumb) {
+        if (thumbSrc) { pillThumb.src = thumbSrc; pillThumb.style.display = "block"; }
+        else          { pillThumb.style.display = "none"; }
+      }
+    }
+
+    // mousemove: only update background gradient (no tilt on new pill UI)
     addEventListener("mousemove", (e) => {
       document.documentElement.style.setProperty("--mx", e.clientX + "px");
       document.documentElement.style.setProperty("--my", e.clientY + "px");
-
-      if (isMobileHud()){
-        document.documentElement.style.setProperty("--tiltY", "0deg");
-        document.documentElement.style.setProperty("--tiltX", "0deg");
-        return;
-      }
-
-      const rect = hud.getBoundingClientRect();
-      const cx = rect.left + rect.width/2;
-      const cy = rect.top + rect.height/2;
-
-      let dx = (e.clientX - cx) / rect.width;
-      let dy = (e.clientY - cy) / rect.height;
-
-      dx = clamp(dx, -0.6, 0.6);
-      dy = clamp(dy, -0.6, 0.6);
-
-      const scale = hud.classList.contains("min") ? 2.2 : 5.0;
-      document.documentElement.style.setProperty("--tiltY", (dx * scale).toFixed(2) + "deg");
-      document.documentElement.style.setProperty("--tiltX", (-dy * scale).toFixed(2) + "deg");
     });
 
     // ---------------- AUDIO ----------------
@@ -1689,6 +2059,12 @@
     function setPlayPauseIcon(playing){
       playIcon.style.display  = playing ? "none" : "";
       pauseIcon.style.display = playing ? "" : "none";
+      // mirror in card transport
+      if (playIconCard)  playIconCard.style.display  = playing ? "none" : "";
+      if (pauseIconCard) pauseIconCard.style.display = playing ? "" : "none";
+      // spin album art when playing
+      const pillArt = document.getElementById("pillArt");
+      if (pillArt) pillArt.classList.toggle("spinning", playing);
     }
 
     fileInput.addEventListener("change", (e) => {
@@ -1701,8 +2077,10 @@
       connectFileSource();
       isLocalFileMode = true;
       currentStreamTrack = null;
-      nowPlayingTitle.textContent = f.name.replace(/\.[^.]+$/, "");
+      const title = f.name.replace(/\.[^.]+$/, "");
+      nowPlayingTitle.textContent  = title;
       nowPlayingArtist.textContent = "Local file";
+      updatePillNowPlaying(title, "Local file", null);
       updateDocTitle(!audioEl.paused);
       nowPlayingThumb.classList.remove("visible");
       updatePrevNextButtons();
@@ -2112,8 +2490,12 @@
     const nowPlayingArtist = document.getElementById("nowPlayingArtist");
     const queuePanel       = document.getElementById("queuePanel");
     const transportRow     = document.getElementById("transportRow");
+    // prevBtn/nextBtn = wing buttons; card mirrors delegate to them
     const prevBtn          = document.getElementById("prevBtn");
     const nextBtn          = document.getElementById("nextBtn");
+    if (prevBtnCard) prevBtnCard.addEventListener("click", () => prevBtn?.click());
+    if (nextBtnCard) nextBtnCard.addEventListener("click", () => nextBtn?.click());
+    if (playPauseBtnCard) playPauseBtnCard.addEventListener("click", () => playPauseBtn?.click());
     const seekBar          = document.getElementById("seekBar");
     const seekTime         = document.getElementById("seekTime");
     const seekDuration     = document.getElementById("seekDuration");
@@ -2415,6 +2797,7 @@
         };
         nowPlayingTitle.textContent  = track.name   || "—";
         nowPlayingArtist.textContent = track.artist  || "—";
+        updatePillNowPlaying(track.name || "streaming", track.artist || "", track.pic || null);
 
         if (audioCtx.state === "suspended") await audioCtx.resume();
         await audioEl.play();
@@ -2603,14 +2986,38 @@
       return `${m}:${s.toString().padStart(2,"0")}`;
     }
 
+    const pillSeekFill  = document.getElementById("pillSeekFill");
+    const pillSeekScrub = document.getElementById("pillSeekScrub");
+
+    function updatePillSeek(pct) {
+      if (pillSeekFill) pillSeekFill.style.width = pct + "%";
+      if (pillSeekScrub) pillSeekScrub.value = pct;
+    }
+
     let seekDragging = false;
+    let pillSeekDragging = false;
+
     audioEl.addEventListener("timeupdate", () => {
-      if (seekDragging) return;
+      if (seekDragging || pillSeekDragging) return;
       if (!Number.isFinite(audioEl.duration) || audioEl.duration <= 0) return;
+      const pct = (audioEl.currentTime / audioEl.duration) * 100;
       seekBar.max = 100;
-      seekBar.value = (audioEl.currentTime / audioEl.duration) * 100;
+      seekBar.value = pct;
       seekTime.textContent = fmtTime(audioEl.currentTime);
       seekDuration.textContent = fmtTime(audioEl.duration);
+      updatePillSeek(pct);
+    });
+
+    // Pill seek scrub — drag to seek
+    pillSeekScrub.addEventListener("input", () => {
+      pillSeekDragging = true;
+      updatePillSeek(+pillSeekScrub.value);
+    });
+    pillSeekScrub.addEventListener("change", () => {
+      if (Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
+        audioEl.currentTime = (+pillSeekScrub.value / 100) * audioEl.duration;
+      }
+      pillSeekDragging = false;
     });
     audioEl.addEventListener("loadedmetadata", () => {
       seekDuration.textContent = fmtTime(audioEl.duration);
@@ -3679,6 +4086,7 @@
       saveSettings();
       colorAdaptPill.classList.remove("active");
       colorAdaptText.textContent = "color adapt";
+      resetUIAccent();
     }
 
     randomizeBtn.addEventListener("click", () => { if (konamiActive) teardownHeartMode(); randomizeAll(); });
@@ -4441,23 +4849,7 @@
       applyVolume();
     }
 
-    // Restore HUD minimized state from localStorage
-    (function restoreHudMin(){
-      try {
-        const saved = localStorage.getItem(HUD_MIN_KEY);
-        if (saved !== null) { setMinimized(saved === "1", false); return; }
-      } catch(_){}
-      // No saved state — start minimized on mobile
-      if (window.matchMedia("(max-width: 560px)").matches) setMinimized(true, false);
-    })();
-
-    (function applyMobileHudLayout(){
-      if (!window.matchMedia("(max-width: 560px)").matches) return;
-      document.documentElement.style.setProperty("--tiltY", "0deg");
-      document.documentElement.style.setProperty("--tiltX", "0deg");
-      if (hadSaved) return; // respect the user's own remembered open/closed state
-      document.querySelectorAll("details.group.collapsible").forEach((d) => { d.open = false; });
-    })();
+    // (HUD minimize/tilt removed — new pill UI handles this via morph expand/collapse)
 
     // ================================================================
     // RGB OVERRIDE ENGINE
@@ -4716,10 +5108,268 @@
 
       applyLook();
       applyLyricsTheme();
+      applyUIAccent(vivid, mid);
 
       colorAdaptPill.classList.add("active");
       colorAdaptText.textContent = "color adapted";
     }
+
+    function toHex(r,g,b){
+      return "#" + [r,g,b].map(v=>Math.round(Math.max(0,Math.min(255,v))).toString(16).padStart(2,"0")).join("");
+    }
+
+    function applyUIAccent([r1,g1,b1], [r2,g2,b2]){
+      const root = document.documentElement;
+      root.style.setProperty("--accent-1", `${Math.round(r1)},${Math.round(g1)},${Math.round(b1)}`);
+      root.style.setProperty("--accent-2", `${Math.round(r2)},${Math.round(g2)},${Math.round(b2)}`);
+      const hex1 = toHex(r1,g1,b1);
+      const hex2 = toHex(r2,g2,b2);
+      root.style.setProperty("--accent-1-hex", hex1);
+      root.style.setProperty("--accent-2-hex", hex2);
+      // Deep dark panel base: accent color crushed to ~7% brightness
+      const pr = Math.round(r1 * 0.07), pg = Math.round(g1 * 0.07), pb = Math.round(b1 * 0.07);
+      root.style.setProperty("--panel-base", `rgba(${pr},${pg},${pb},.94)`);
+      updateSliderStyles(hex1, hex2, `${Math.round(r1)},${Math.round(g1)},${Math.round(b1)}`, `${Math.round(r2)},${Math.round(g2)},${Math.round(b2)}`, pr, pg, pb);
+    }
+
+    function resetUIAccent(){
+      const root = document.documentElement;
+      root.style.setProperty("--accent-1", "205,180,255");
+      root.style.setProperty("--accent-2", "125,249,255");
+      root.style.setProperty("--accent-1-hex", "#cdb4ff");
+      root.style.setProperty("--accent-2-hex", "#7df9ff");
+      root.style.setProperty("--panel-base", "rgba(8,10,16,.92)");
+      updateSliderStyles("#cdb4ff","#7df9ff","205,180,255","125,249,255", 8, 10, 16);
+    }
+
+    // Dynamically inject a <style> tag to override slider pseudo-element colors
+    // because CSS custom properties cannot be used inside ::-webkit-slider-thumb backgrounds directly
+    // when they reference channel triplets — we need the computed hex instead.
+    let _sliderStyleEl = null;
+    function updateSliderStyles(hex1, hex2, rgb1, rgb2, pr=8, pg=10, pb=16){
+      if (!_sliderStyleEl){
+        _sliderStyleEl = document.createElement("style");
+        _sliderStyleEl.id = "dynamic-accent-styles";
+        document.head.appendChild(_sliderStyleEl);
+      }
+      _sliderStyleEl.textContent = `
+        /* ── SEEK BAR ── */
+        #seekBar {
+          background: linear-gradient(90deg, rgba(${rgb1},.22), rgba(${rgb2},.12)) !important;
+          transition: background 0.6s ease;
+        }
+        #seekBar::-webkit-slider-thumb {
+          background: linear-gradient(180deg, ${hex1}, ${hex2}) !important;
+          box-shadow: 0 0 8px rgba(${rgb1},.80) !important;
+          transition: background 0.6s ease, box-shadow 0.6s ease;
+        }
+        #seekBar::-moz-range-thumb {
+          background: linear-gradient(180deg, ${hex1}, ${hex2}) !important;
+          box-shadow: 0 0 8px rgba(${rgb1},.80) !important;
+        }
+        #seekBar::-moz-range-track {
+          background: linear-gradient(90deg, rgba(${rgb1},.22), rgba(${rgb2},.12)) !important;
+        }
+        /* ── VOLUME SLIDER ── */
+        #volumeSlider {
+          background: linear-gradient(90deg, rgba(${rgb1},.30), rgba(${rgb2},.18)) !important;
+          transition: background 0.6s ease;
+        }
+        #volumeSlider::-webkit-slider-thumb {
+          background: linear-gradient(180deg, ${hex1}, ${hex2}) !important;
+          box-shadow: 0 0 6px rgba(${rgb1},.70) !important;
+          transition: background 0.6s ease, box-shadow 0.6s ease;
+        }
+        #volumeSlider::-moz-range-thumb {
+          background: linear-gradient(180deg, ${hex1}, ${hex2}) !important;
+          box-shadow: 0 0 6px rgba(${rgb1},.70) !important;
+        }
+        #volumeSlider::-moz-range-track {
+          background: linear-gradient(90deg, rgba(${rgb1},.30), rgba(${rgb2},.18)) !important;
+        }
+        /* ── OTHER RANGE SLIDERS (sensitivity, bloom, etc.) ── */
+        input[type="range"] {
+          accent-color: ${hex1} !important;
+        }
+        /* ── SEARCH INPUT ── */
+        #searchInput {
+          border-color: rgba(${rgb1},.22) !important;
+          background: rgba(${rgb1},.06) !important;
+          transition: border-color 0.6s ease, background 0.6s ease, box-shadow 0.15s;
+        }
+        #searchInput:focus {
+          border-color: rgba(${rgb1},.50) !important;
+          box-shadow: 0 0 0 2px rgba(${rgb1},.12) !important;
+        }
+        /* ── SEARCH RESULTS ── */
+        .sResult {
+          border-color: rgba(${rgb1},.10) !important;
+          background: rgba(${rgb1},.04) !important;
+          transition: background 0.6s ease, border-color 0.6s ease;
+        }
+        .sResult:hover {
+          background: rgba(${rgb1},.10) !important;
+          border-color: rgba(${rgb1},.28) !important;
+        }
+        .sResult.active {
+          background: linear-gradient(180deg, rgba(${rgb1},.16), rgba(${rgb2},.06)) !important;
+          border-color: rgba(${rgb1},.42) !important;
+        }
+        .sThumb-placeholder { background: rgba(${rgb1},.08) !important; }
+        .sBadge {
+          border-color: rgba(${rgb1},.16) !important;
+          background: rgba(${rgb1},.05) !important;
+        }
+        .sQueueBtn {
+          border-color: rgba(${rgb1},.18) !important;
+          background: rgba(${rgb1},.06) !important;
+          transition: background 0.6s ease, border-color 0.6s ease;
+        }
+        .sQueueBtn:hover {
+          background: linear-gradient(180deg, rgba(${rgb1},.28), rgba(${rgb2},.12)) !important;
+          border-color: rgba(${rgb1},.42) !important;
+        }
+        .sQueueBtn.queued { border-color: rgba(${rgb1},.35) !important; }
+        /* ── QUEUE PANEL ── */
+        .qItem {
+          border-color: rgba(${rgb1},.10) !important;
+          background: rgba(${rgb1},.04) !important;
+          transition: background 0.6s ease, border-color 0.6s ease;
+        }
+        .qItem .qPlay:hover {
+          background: linear-gradient(180deg, rgba(${rgb1},.28), rgba(${rgb2},.12)) !important;
+        }
+        #queueLabel .radioTag { color: rgba(${rgb1},.75) !important; }
+        /* ── PLAYER CARD ── */
+        #playerCard {
+          border-color: rgba(${rgb1},.32) !important;
+          background: linear-gradient(180deg, rgba(${rgb1},.14), rgba(${rgb2},.05)) !important;
+          transition: background 0.6s ease, border-color 0.6s ease;
+        }
+        /* ── TRANSPORT BUTTONS ── */
+        .transportBtn {
+          border-color: rgba(${rgb1},.32) !important;
+          background: linear-gradient(180deg, rgba(${rgb1},.22), rgba(${rgb2},.10)) !important;
+          transition: background 0.6s ease, border-color 0.6s ease;
+        }
+        .transportBtn:hover {
+          background: linear-gradient(180deg, rgba(${rgb1},.38), rgba(${rgb2},.20)) !important;
+          border-color: rgba(${rgb1},.55) !important;
+        }
+        .transportBtn:disabled { opacity: .30 !important; }
+        #playPauseBtn {
+          background: radial-gradient(circle at 35% 30%, rgba(${rgb1},.50), rgba(${rgb2},.22)) !important;
+          border-color: rgba(${rgb1},.60) !important;
+          box-shadow: 0 0 14px rgba(${rgb1},.28) !important;
+          transition: background 0.6s ease, border-color 0.6s ease, box-shadow 0.6s ease;
+        }
+        #playPauseBtn:hover {
+          background: radial-gradient(circle at 35% 30%, rgba(${rgb1},.65), rgba(${rgb2},.30)) !important;
+        }
+        /* ── VOLUME BUTTON ── */
+        #volumeBtn {
+          border-color: rgba(${rgb1},.32) !important;
+          background: linear-gradient(180deg, rgba(${rgb1},.22), rgba(${rgb2},.10)) !important;
+          transition: background 0.6s ease, border-color 0.6s ease;
+        }
+        #volumeBtn:hover {
+          background: linear-gradient(180deg, rgba(${rgb1},.38), rgba(${rgb2},.20)) !important;
+          border-color: rgba(${rgb1},.55) !important;
+        }
+        /* ── SEARCH BUTTON ── */
+        #searchBtn {
+          border-color: rgba(${rgb1},.40) !important;
+          background: linear-gradient(180deg, rgba(${rgb1},.28), rgba(${rgb2},.14)) !important;
+          transition: background 0.6s ease, border-color 0.6s ease;
+        }
+        #searchBtn:hover {
+          background: linear-gradient(180deg, rgba(${rgb1},.42), rgba(${rgb2},.22)) !important;
+        }
+        /* ── MORPH + WINGS panel base ── */
+        .morph, .wing-left, .wing-right {
+          --panel-base: rgba(${pr},${pg},${pb},.94) !important;
+        }
+        /* ── CTRL BUTTONS (play/prev/next wings) ── */
+        .ctrl-btn:hover {
+          background: linear-gradient(180deg, rgba(${rgb1},.28), rgba(${rgb2},.14)) !important;
+          border-color: rgba(${rgb1},.45) !important;
+        }
+        /* ── VOLUME FILL BAR (right wing) ── */
+        .vol-fill {
+          background: linear-gradient(90deg, rgba(${rgb1},.25), rgba(${rgb2},.14)) !important;
+          transition: background 0.6s ease;
+        }
+        /* ── PILL SEEK FILL ── */
+        .pill-seek-fill {
+          background: linear-gradient(90deg, rgba(${rgb1},.18), rgba(${rgb2},.09)) !important;
+          transition: background 0.6s ease;
+        }
+        /* ── ART PLACEHOLDER ── */
+        .art-sm {
+          background: linear-gradient(135deg, rgba(${rgb1},.40), rgba(${rgb2},.22)) !important;
+          transition: background 0.6s ease;
+        }
+        /* ── GROUP BORDERS ── */
+        .group {
+          border-color: rgba(${rgb1},.16) !important;
+          transition: border-color 0.6s ease;
+        }
+        /* ── SECTION HEADER DIVIDERS ── */
+        details.group > summary.groupSummary {
+          border-bottom-color: rgba(${rgb1},.22) !important;
+          color: rgba(255,255,255,.86) !important;
+        }
+        /* ── CARD TOP BORDER ── */
+        .card-top {
+          border-bottom-color: rgba(${rgb1},.20) !important;
+        }
+        /* ── STATUS PILLS ── */
+        .pill {
+          background: rgba(${rgb1},.10) !important;
+          border-color: rgba(${rgb1},.22) !important;
+          transition: background 0.6s ease, border-color 0.6s ease;
+        }
+        /* ── NOW PLAYING DOT ── */
+        .pill.on .dot {
+          background: linear-gradient(180deg, ${hex1}, ${hex2}) !important;
+          box-shadow: 0 0 18px rgba(${rgb1},.50) !important;
+          transition: background 0.6s ease, box-shadow 0.6s ease;
+        }
+        /* ── COLOR ADAPT PILL ── */
+        #colorAdaptPill.active {
+          background: linear-gradient(180deg, rgba(${rgb1},.20), rgba(${rgb2},.08)) !important;
+          border-color: rgba(${rgb1},.42) !important;
+        }
+        #colorAdaptPill.active #colorAdaptDot {
+          background: linear-gradient(180deg, ${hex1}, ${hex2}) !important;
+          box-shadow: 0 0 10px rgba(${rgb1},.55) !important;
+        }
+        /* ── FONT SWATCHES ── */
+        .fontSwatch.sel {
+          background: rgba(${rgb1},.18) !important;
+          border-color: rgba(${rgb1},.60) !important;
+          box-shadow: 0 0 14px rgba(${rgb1},.22) !important;
+        }
+        .fontSwatch:hover { border-color: rgba(${rgb1},.40) !important; }
+        /* ── GENERAL BUTTONS in settings ── */
+        button:not(.secondary):not(.danger):not(.ctrl-btn):not(.transportBtn):not(#playPauseBtn):not(#volumeBtn):not(#searchBtn):not(.icon-btn):not(.mute-btn):not(#konamiCloseBtn):not(#queueCollapseBtn):not(#queueClearBtn):not(.sQueueBtn) {
+          background: linear-gradient(180deg, rgba(${rgb1},.24), rgba(${rgb2},.12)) !important;
+          border-color: rgba(${rgb1},.36) !important;
+          transition: background 0.6s ease, border-color 0.6s ease;
+        }
+        /* ── SCROLLBAR ── */
+        #hudBody::-webkit-scrollbar-thumb { background: rgba(${rgb1},.24) !important; }
+        #searchResults { scrollbar-color: rgba(${rgb1},.22) transparent !important; }
+        /* ── CRT FRAME GLOW ── */
+        #crtFrame::after {
+          box-shadow:
+            0 0 0 2px rgba(0,0,0,.55) inset,
+            0 0 32px rgba(${rgb2},.10),
+            0 0 24px rgba(${rgb1},.08) !important;
+        }
+      `;
+    }
+    resetUIAccent();
 
     function applyGenrePalette(genreHint){
       // Match genre hint against known keywords
@@ -4739,6 +5389,10 @@
 
       applyLook();
       applyLyricsTheme();
+
+      // Extract colors from the genre palette hex values for UI accent
+      function hexToRgbArr(h){ const n=parseInt(h.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+      applyUIAccent(hexToRgbArr(cSculpt), hexToRgbArr(cGlow));
 
       colorAdaptPill.classList.add("active");
       colorAdaptText.textContent = matched ? `genre: ${lower.split(" ")[0]}` : "color adapt";

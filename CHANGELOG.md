@@ -1,4 +1,26 @@
 # Changelog
+## [1.7] - 2026-07-15
+
+### Added
+
+* Full album art color adaptation — the entire UI now derives its palette from the current track's album art, including panel backgrounds, borders, buttons, seek bar, volume fill, search input, search results, queue items, status pills, section dividers, scrollbars, and the CRT frame glow.
+* Retractable wings — playback controls (previous, play/pause, next) and the volume control now live in slide-out wings flanking the pill, revealed on hover with a short delay and smoothly retracted on mouse leave.
+* Dynamic scanline tinting — the CRT scanline texture is preserved but its color adapts to the album art palette rather than staying neutral.
+* Lyric glow color now updates automatically with the album art palette.
+
+### Changed
+
+* Complete UI overhaul: the player is now a morphing pill/card hybrid — collapsed it sits as a compact pill with album art, track info, and a settings cog; clicking the cog expands it into a full settings card with smooth cross-fade transitions.
+* All UI surfaces (backgrounds, borders, fills, glows) are tinted with a deeply darkened version of the album art's dominant color as the base panel color, with accent colors applied on top.
+* Settings panel sections (Playback & Search, Shape & Style, Colors, Audio Reactivity, Effects & CRT, Lyrics) are now displayed as collapsible groups inside the expanded card.
+* Color adaptation now updates every UI element site-wide rather than only a subset of buttons and progress bars.
+
+### Fixed
+
+* Settings cog button was unclickable when the pill was collapsed due to the seek scrubber sitting on top of it — fixed by raising the pill content layer above the scrubber.
+* Seek scrubber no longer covers the entire expanded settings card.
+* Pill expand/collapse and wing slide transitions restored to their original timing and easing after being disrupted by color adaptation changes.
+
 ## [1.6] - 2026-06-27
 
 ### Added
