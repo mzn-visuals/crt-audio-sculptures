@@ -584,11 +584,8 @@
       #crtFrame{ inset: 8px; }
       #hud{ bottom: max(8px, env(safe-area-inset-bottom, 8px)); }
       .pill-row{ width: calc(100vw - 16px); }
-      .wing-left{ right: calc(50% + 148px); width: 96px; }
-      .wing-left.open{ width: 190px; }
-      .wing-right{ left: calc(50% + 148px); width: 96px; }
-      .wing-right.open{ width: 190px; }
-      .morph{ width: 296px; }
+      .wing-left, .wing-right{ display: none; }
+      .morph{ width: calc(100vw - 32px); }
       .morph.expanded{ width: calc(100vw - 16px); max-height: calc(100vh - 75px); }
       #hudBody{ padding: 8px 10px 10px; gap: 8px; }
       .group{ width: 100%; padding: 8px; }
