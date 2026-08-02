@@ -413,7 +413,7 @@
     .mute-btn svg{ width:18px;height:18px;display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round; }
     .vol-scrub{
       position:absolute;inset:0;width:100%;height:100%;
-      opacity:0;cursor:pointer;z-index:2; -webkit-appearance:none; appearance:none;
+      opacity:0;cursor:pointer;z-index:2; -webkit-appearance:none;
     }
 
     /* ── CARD BODY (scrollable settings) ── */
@@ -1291,7 +1291,7 @@
       padding: 24px 20px 22px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 0;
     }
     #konamiMessage{
       font-size: 13px;
@@ -1301,22 +1301,6 @@
       white-space: pre-wrap;
       min-height: 40px;
     }
-    #konamiArduinoBtn{
-      cursor: pointer;
-      padding: 10px 16px;
-      border-radius: 12px;
-      border: 1px solid rgba(var(--accent-1),.32);
-      background: linear-gradient(180deg, rgba(var(--accent-1),.22), rgba(var(--accent-2),.10));
-      color: var(--text);
-      font: inherit;
-      font-size: 12px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      letter-spacing: .4px;
-      transition: background .15s;
-      align-self: flex-start;
-    }
-    #konamiArduinoBtn:hover{ background: linear-gradient(180deg, rgba(var(--accent-1),.34), rgba(var(--accent-2),.18)); }
-    #konamiArduinoBtn:disabled{ opacity:.45; cursor:default; }
 
     .qItem{
       display:flex;
@@ -1766,13 +1750,12 @@
       <div id="konamiModalHeader">
         <div id="konamiModalTitle">
           <span class="konamiHeart">♥</span>
-          <span>CRT // Audio Sculptures</span>
+          <span>for Aydo 🤍</span>
         </div>
         <button id="konamiCloseBtn" type="button">✕</button>
       </div>
       <div id="konamiModalBody">
-        <div id="konamiMessage">made with ♥ by mzn_visuals</div>
-        <button id="konamiArduinoBtn" type="button">Connect Arduino</button>
+        <div id="konamiMessage">&#8203;</div>
       </div>
     </div>
   </div>
@@ -2205,7 +2188,7 @@
     // The proxy hits YouTube InnerTube / stream URLs and adds CORS headers.
     // ================================================================
 
-    const LOCAL_PROXY = "https://proxyftw.onrender.com";
+    const LOCAL_PROXY = "https://jake-enquiry-broader-fred.trycloudflare.com";
 
     // Rewrite a YouTube URL so it goes through proxy.js
     // proxy.js reads ?__host, forwards there, adds CORS headers
@@ -2751,7 +2734,9 @@
     async function playTrack(track, el = null, statusEl = null, opts = {}){
       const { fromHistory = false, freshPick = !fromHistory } = opts;
 
-      // Heart/Konami scene persists across song changes
+      // Revert the heart/Konami scene when a new song starts playing,
+      // unless this call IS the Konami song initiating its own playback.
+      if (konamiActive && !opts.konamiPlay) teardownHeartMode();
 
       // A genuinely new manual pick (searched + clicked, or a pasted link)
       // ends whatever queue/radio was running, exactly like YouTube Music:
@@ -2879,7 +2864,9 @@
             audioEl.play().catch(() => {});
             return;
           }
-          // Heart/Konami scene persists across song changes
+          // If this was the Konami song but Konami has since been closed,
+          // make sure the heart scene is fully torn down before advancing
+          if (heartMesh || heartPts) teardownHeartMode();
           if (statusEl) statusEl.textContent = "✓";
           if (el) el.classList.remove("active");
           advanceQueue();
@@ -3924,7 +3911,7 @@
     wireframeEl.addEventListener("change", () => { applyLook(); setPresetNameFromCurrent(); });
 
     shapeEl.addEventListener("change", () => {
-      // Heart/Konami scene persists across shape changes
+      if (konamiActive) teardownHeartMode();
       if (!Object.keys(shapeParams).length) shapeParams = setDefaultShapeParams(shapeEl.value);
       rebuildSculpture();
       setPresetNameFromCurrent();
@@ -4099,8 +4086,8 @@
       resetUIAccent();
     }
 
-    randomizeBtn.addEventListener("click", () => { randomizeAll(); });
-    resetBtn.addEventListener("click",     () => { resetDefaults(); });
+    randomizeBtn.addEventListener("click", () => { if (konamiActive) teardownHeartMode(); randomizeAll(); });
+    resetBtn.addEventListener("click",     () => { if (konamiActive) teardownHeartMode(); resetDefaults(); });
 
     // ================================================================
     // SETTINGS PERSISTENCE — localStorage
@@ -5549,43 +5536,11 @@
     let konamiActive  = false;
     let heartMesh     = null;
     let heartPts      = null, heartPtsGeo = null, heartPtsMat = null, heartSpriteTex = null;
-    // ---- Arduino Serial (Web Serial API) ----
-    let arduinoPort   = null;
-    let arduinoWriter = null;
-    let arduinoLOn    = false; // track L (kick) state
-
-    async function connectArduino() {
-      try {
-        if (!("serial" in navigator)) {
-          alert("Web Serial API not supported in this browser.\nUse Chrome or Edge on desktop.");
-          return;
-        }
-        const port = await navigator.serial.requestPort();
-        await port.open({ baudRate: 115200 });
-        arduinoPort   = port;
-        arduinoWriter = port.writable.getWriter();
-        console.info("[Arduino] connected");
-      } catch (e) {
-        console.info("[Arduino] connection cancelled or failed:", e.message);
-      }
-    }
-
-    async function sendArduinoL(on) {
-      if (!arduinoWriter) return;
-      if (on === arduinoLOn) return; // no change, skip write
-      arduinoLOn = on;
-      try {
-        await arduinoWriter.write(new Uint8Array([on ? 76 : 108])); // 'L' or 'l'
-      } catch (e) {
-        console.warn("[Arduino] write error:", e.message);
-        arduinoWriter = null;
-        arduinoPort   = null;
-      }
-    }
+    let konamiSearchResult = null;
 
     const konamiOverlay  = document.getElementById("konamiOverlay");
     const konamiCloseBtn = document.getElementById("konamiCloseBtn");
-    const konamiArduinoBtn = document.getElementById("konamiArduinoBtn");
+    const konamiMsg      = document.getElementById("konamiMessage");
 
     function closeKonami(){
       // Only hide the overlay — heart sculpture + particles stay active
@@ -5595,16 +5550,6 @@
     }
     konamiCloseBtn.addEventListener("click", closeKonami);
     konamiOverlay.addEventListener("click", e => { if (e.target === konamiOverlay) closeKonami(); });
-    
-    konamiArduinoBtn.addEventListener("click", async () => {
-      if (!arduinoPort) {
-        await connectArduino();
-        if (arduinoPort) {
-          konamiArduinoBtn.textContent = "Arduino Connected";
-          konamiArduinoBtn.disabled = true;
-        }
-      }
-    });
 
     function triggerShake(cls){
       if (!cls) return;
@@ -5680,8 +5625,25 @@
 
     async function activateKonami(){
       if (konamiActive){
+        konamiMsg.textContent = "you've been stuck in my head since the night we first VC'd — the realness, the fun, just everything about that night. i'll be honest, i've had something for you since that day. i've admired you in ways i can't fully explain. i actually really like you and i know this is random but you gave me this song and i built all of this around it, around you. ~ mzn";
         konamiOverlay.classList.add("visible");
         konamiOverlay.setAttribute("aria-hidden","false");
+        // Re-play the song from the start and re-fetch lyrics
+        try {
+          if (konamiSearchResult){
+            await playTrack(konamiSearchResult, null, null, { freshPick: true, konamiPlay: true });
+          } else {
+            const tracks = await innertubeSearch("Save Your Tears Remix The Weeknd Ariana Grande");
+            if (tracks && tracks.length){
+              konamiSearchResult = tracks[0];
+              await playTrack(konamiSearchResult, null, null, { freshPick: true, konamiPlay: true });
+            }
+          }
+          // Re-fetch lyrics every time
+          lyricsArtistEl.value = "The Weeknd, Ariana Grande";
+          lyricsTitleEl.value  = "Save Your Tears";
+          setTimeout(() => lyricsFetchBtn.click(), 1400);
+        } catch(e){ console.info("[Konami] re-play failed:", e.message); }
         return;
       }
       konamiActive = true;
@@ -5690,12 +5652,40 @@
       buildHeartScene();
       buildHeartParticles();
 
-      // 2. Show modal with Arduino connection button
+      // 2. Show modal with message (TBD — placeholder for now)
+      konamiMsg.textContent = "you've been stuck in my head since the night we first VC'd — the realness, the fun, just everything about that night. i'll be honest, i've had something for you since that day. i've admired you in ways i can't fully explain. i actually really like you and i know this is random but you gave me this song and i built all of this around it, around you. ~ mzn";
       konamiOverlay.classList.add("visible");
       konamiOverlay.setAttribute("aria-hidden","false");
+
+      // 3. Background: search + play + lyrics + color-adapt
+      try {
+        const tracks = await innertubeSearch("Save Your Tears Remix The Weeknd Ariana Grande");
+        if (tracks && tracks.length){
+          konamiSearchResult = tracks[0];
+          // Play silently (same as clicking a result)
+          await playTrack(konamiSearchResult, null, null, { freshPick: true, konamiPlay: true });
+          // Auto-fetch lyrics
+          lyricsArtistEl.value = "The Weeknd, Ariana Grande";
+          lyricsTitleEl.value  = "Save Your Tears";
+          // Trigger fetch after a moment (audio element needs to load)
+          setTimeout(() => lyricsFetchBtn.click(), 1400);
+          // Color-adapt from thumbnail
+          if (konamiSearchResult.pic){
+            try {
+              const colors = await extractColorsFromImage(konamiSearchResult.pic);
+              applyAdaptivePalette(colors);
+              // Also refresh heart particles with the new palette
+              if (heartPts){ fxGroup.remove(heartPts); heartPtsGeo.dispose(); heartPtsMat.dispose(); heartPts=null; }
+              buildHeartParticles();
+            } catch(_){}
+          }
+        }
+      } catch(e){
+        console.info("[Konami] background init:", e.message);
+      }
     }
 
-        // Konami key listener
+    // Konami key listener
     window.addEventListener("keydown", e => {
       // Don't fire inside text inputs
       const tag = document.activeElement?.tagName?.toLowerCase();
@@ -5740,15 +5730,7 @@
       }
       if (analyser) analyser.smoothingTimeConstant = +smoothingEl.value;
 
-      // Arduino Kick Reactor
-      // Built-in LED on pin 13 reacts to kicks at 75% threshold
-      if (arduinoWriter && anyAudio) {
-        sendArduinoL(low >= 0.75);    // kick detection at 75% threshold
-      } else if (arduinoWriter && !anyAudio) {
-        sendArduinoL(false);
-      }
-
-      // NEW: loudness (RMS) from waveform
+      // NEW: loudness (RMS) from waveform; used for glow/particles/rotation pace
       let volInstant = 0;
       if (analyser && timeData){
         analyser.getByteTimeDomainData(timeData);
