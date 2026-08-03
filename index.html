@@ -2159,18 +2159,24 @@
         const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
         const isConnected = window.__crtConnect && lastAudioOwner !== null;
 
-        // If connected and not owner, send commands regardless of local audio state
+        // If connected and not owner, send commands based on Firebase state
         if (isConnected && !isOwner) {
-          ensureAudio();
-          if (audioCtx.state === "suspended") await audioCtx.resume();
-
-          if (audioEl.paused) {
-            if (window.__crtConnect.sendCommand) {
-              window.__crtConnect.sendCommand("PLAY");
-            }
-          } else {
-            if (window.__crtConnect.sendCommand) {
-              window.__crtConnect.sendCommand("PAUSE");
+          // Get current playing state from Firebase
+          const currentUser = localStorage.getItem("crt_connect_username");
+          if (currentUser && window.__crtConnect && window.__crtConnect.sendCommand && window.__crtConnect.getDb) {
+            // Get the current state from Firebase to determine if we should play or pause
+            const { get, ref } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js");
+            const db = window.__crtConnect.getDb();
+            const snap = await get(ref(db, `users/${currentUser}/state`));
+            if (snap.exists()) {
+              const state = snap.val();
+              const isActuallyPlaying = state.playing === true;
+              // Send the opposite command
+              if (isActuallyPlaying) {
+                window.__crtConnect.sendCommand("PAUSE");
+              } else {
+                window.__crtConnect.sendCommand("PLAY");
+              }
             }
           }
           return;
@@ -6306,6 +6312,12 @@
           if (pillSeekScrub) pillSeekScrub.value = pct;
         }
 
+        // Update volume slider
+        const volumeSlider = document.getElementById('volumeSlider');
+        if (volumeSlider && state.volume !== undefined) {
+          volumeSlider.value = Math.round(state.volume * 100);
+        }
+
         // Update pill now-playing info (already declared above)
         if (pillTitle && state.title && state.title !== pillTitle.textContent) pillTitle.textContent = state.title;
         if (pillArtist && state.artist !== undefined && state.artist !== pillArtist.textContent) pillArtist.textContent = state.artist || '';
@@ -6461,8 +6473,22 @@
           break;
         case 'MUTE':
           console.log('[CRT Connect] Executing MUTE command');
-          const muteBtn = document.getElementById('muteBtn');
-          if (muteBtn) muteBtn.click();
+          // Toggle wing mute state directly
+          const volScrub = document.getElementById('volScrub');
+          const volPct = document.getElementById('volPct');
+          if (volScrub && volPct) {
+            if (volScrub.value == 0) {
+              // Unmute
+              volScrub.value = 50;
+              volPct.textContent = "50%";
+            } else {
+              // Mute
+              volScrub.value = 0;
+              volPct.textContent = "0%";
+            }
+            // Trigger the input event to apply the volume
+            volScrub.dispatchEvent(new Event('input'));
+          }
           break;
         case 'NEXT':
           console.log('[CRT Connect] Executing NEXT command');
@@ -6677,7 +6703,8 @@
       broadcastState,
       sendCommand,
       getAudioOwner: () => lastAudioOwner,
-      setAudioOwner: (owner) => { lastAudioOwner = owner; }
+      setAudioOwner: (owner) => { lastAudioOwner = owner; },
+      getDb: () => db
     };
 
     // ── UI event listeners ────────────────────────────────────────────────────
