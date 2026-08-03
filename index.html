@@ -413,7 +413,7 @@
     .mute-btn svg{ width:18px;height:18px;display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round; }
     .vol-scrub{
       position:absolute;inset:0;width:100%;height:100%;
-      opacity:0;cursor:pointer;z-index:2; -webkit-appearance:none;
+      opacity:0;cursor:pointer;z-index:2; -webkit-appearance:none; appearance:none;
     }
 
     /* ── CARD BODY (scrollable settings) ── */
@@ -5948,10 +5948,10 @@
     const deviceList     = document.getElementById("connectDeviceList");
     const noDevicesMsg   = document.getElementById("connectNoDevices");
 
-    // References to main app elements
-    const audioEl        = document.querySelector("audio");
-    const seekBar        = document.getElementById("seekBar");
-    const volumeSlider   = document.getElementById("volumeSlider");
+    // References to main app elements (already declared in main script, just reference them)
+    audioEl        = document.querySelector("audio");
+    seekBar        = document.getElementById("seekBar");
+    volumeSlider   = document.getElementById("volumeSlider");
 
     // ── Show/hide panels ─────────────────────────────────────────────────────
     function showLogin()   { loginPanel.style.display=""; sessionPanel.style.display="none"; }
@@ -5997,6 +5997,15 @@
       localStorage.setItem("crt_connect_user", username);
       showSession(username);
       await registerDevice();
+      // Initialize lastAudioOwner from Firebase state to ensure correct device list display
+      try {
+        const stateSnap = await get(ref(db, `users/${username}/state`));
+        if (stateSnap.exists() && stateSnap.val().audioOwner) {
+          lastAudioOwner = stateSnap.val().audioOwner;
+        }
+      } catch (e) {
+        console.warn('[CRT Connect] Failed to fetch initial audio owner:', e);
+      }
       startHeartbeat();
       startListeners();
     }
@@ -6053,6 +6062,7 @@
         artist:     window.__currentStreamTrack?.artist|| null,
         picUrl:     window.__currentStreamTrack?.picUrl|| null,
         position:   audioEl.currentTime,
+        duration:   audioEl.duration,
         playing:    !audioEl.paused,
         volume:     audioEl.volume,
         audioOwner: deviceId,
@@ -6080,13 +6090,50 @@
       const justGotOwnership = weOwnAudio && prevOwner !== deviceId;
 
       if (!weOwnAudio) {
-        // Mirror: update pill display only
+        // Mirror: update both pill display AND main player UI
         const pillTitle  = document.getElementById('pillTitle');
         const pillArtist = document.getElementById('pillArtist');
         const pillThumb  = document.getElementById('pillThumb');
         if (pillTitle  && state.title  && state.title  !== pillTitle.textContent)  pillTitle.textContent  = state.title;
         if (pillArtist && state.artist !== undefined && state.artist !== pillArtist.textContent) pillArtist.textContent = state.artist || '';
         if (pillThumb  && state.picUrl) { pillThumb.src = state.picUrl; pillThumb.style.display = ''; }
+
+        // Also update main player UI elements
+        const nowPlayingTitle = document.getElementById('nowPlayingTitle');
+        const nowPlayingArtist = document.getElementById('nowPlayingArtist');
+        const nowPlayingThumb = document.getElementById('nowPlayingThumb');
+        if (nowPlayingTitle && state.title && state.title !== nowPlayingTitle.textContent) nowPlayingTitle.textContent = state.title;
+        if (nowPlayingArtist && state.artist !== undefined && state.artist !== nowPlayingArtist.textContent) nowPlayingArtist.textContent = state.artist || '';
+        if (nowPlayingThumb && state.picUrl) {
+          nowPlayingThumb.src = state.picUrl;
+          nowPlayingThumb.classList.add('visible');
+        }
+
+        // Update seek bar position
+        const seekBar = document.getElementById('seekBar');
+        const seekTime = document.getElementById('seekTime');
+        const seekDuration = document.getElementById('seekDuration');
+        if (seekBar && state.position !== undefined && Number.isFinite(state.duration) && state.duration > 0) {
+          const pct = (state.position / state.duration) * 100;
+          seekBar.value = pct;
+          if (seekTime) seekTime.textContent = fmtTime(state.position);
+          if (seekDuration) seekDuration.textContent = fmtTime(state.duration);
+        }
+
+        // Update play/pause icon
+        const playIcon = document.getElementById('playIcon');
+        const pauseIcon = document.getElementById('pauseIcon');
+        if (playIcon && pauseIcon) {
+          playIcon.style.display = state.playing ? "none" : "";
+          pauseIcon.style.display = state.playing ? "" : "none";
+        }
+
+        // Update volume slider
+        const volumeSlider = document.getElementById('volumeSlider');
+        if (volumeSlider && state.volume !== undefined) {
+          volumeSlider.value = Math.round(state.volume * 100);
+        }
+
         return;
       }
 
@@ -6225,6 +6272,10 @@
       }
       noDevicesMsg.style.display = "none";
 
+      // Use lastAudioOwner which is kept in sync by the state listener
+      // Default to this device if no owner has been set yet
+      const actualAudioOwner = lastAudioOwner || deviceId;
+
       // Sort: this device first, then others
       const sorted = [
         ...all.filter(([id]) => id === deviceId),
@@ -6234,7 +6285,7 @@
       sorted.forEach(([id, dev]) => {
         const isOnline   = dev.isOnline && (Date.now() - dev.lastSeen < 90_000);
         const isThisDevice = id === deviceId;
-        const isOwner    = lastAudioOwner === id;
+        const isOwner    = actualAudioOwner === id;
         const label      = isThisDevice ? `${dev.name || "This device"} (you)` : (dev.name || "Unknown");
         const showPlay   = isOnline && !isOwner; // "Play here" on any online non-owner
 
