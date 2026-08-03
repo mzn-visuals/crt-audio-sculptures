@@ -6065,7 +6065,7 @@
         artist:     window.__currentStreamTrack?.artist|| null,
         picUrl:     window.__currentStreamTrack?.picUrl|| null,
         position:   audioEl.currentTime,
-        duration:   audioEl.duration,
+        duration:   Number.isFinite(audioEl.duration) ? audioEl.duration : null,
         playing:    !audioEl.paused,
         volume:     audioEl.volume,
         audioOwner: deviceId,
@@ -6096,6 +6096,13 @@
       console.log('[CRT Connect] Ownership check:', { weOwnAudio, justGotOwnership, prevOwner, newOwner: state.audioOwner });
 
       if (!weOwnAudio) {
+        console.log('[CRT Connect] Not the owner, updating UI only');
+        // If we just lost ownership, pause audio locally
+        if (prevOwner === deviceId && audioEl && !audioEl.paused) {
+          console.log('[CRT Connect] Lost ownership, pausing local audio');
+          audioEl.pause();
+        }
+
         // Mirror: update both pill display AND main player UI
         const pillTitle  = document.getElementById('pillTitle');
         const pillArtist = document.getElementById('pillArtist');
@@ -6390,24 +6397,37 @@
     setTimeout(() => {
       const isOwner = () => lastAudioOwner === deviceId;
       const claimOwnership = () => {
-        // Always claim ownership for local playback
-        lastAudioOwner = deviceId;
-        return true;
+        // Only claim ownership if no current owner
+        if (lastAudioOwner === null) {
+          lastAudioOwner = deviceId;
+          return true;
+        }
+        return false;
       };
 
       // Owner: broadcast state. Non-owner: send command.
       audioEl?.addEventListener("play", () => {
         if (applyingRemote) return;
         console.log('[CRT Connect] Audio play event, current owner:', lastAudioOwner, 'my device:', deviceId);
-        // Local playback always claims ownership
-        claimOwnership();
-        broadcastState();
+        // If we are the owner, broadcast state. If not, send command and prevent local playback.
+        if (isOwner()) {
+          broadcastState();
+        } else {
+          console.log('[CRT Connect] Not the owner, sending PLAY command and pausing local audio');
+          sendCommand("PLAY");
+          // Pause local audio since we're not the owner
+          if (audioEl && !audioEl.paused) audioEl.pause();
+        }
       });
       audioEl?.addEventListener("pause", () => {
         if (applyingRemote) return;
         console.log('[CRT Connect] Audio pause event, current owner:', lastAudioOwner, 'my device:', deviceId);
-        if (isOwner()) broadcastState();
-        else sendCommand("PAUSE");
+        if (isOwner()) {
+          broadcastState();
+        } else {
+          console.log('[CRT Connect] Not the owner, sending PAUSE command');
+          sendCommand("PAUSE");
+        }
       });
 
       seekBar?.addEventListener("change", () => {
