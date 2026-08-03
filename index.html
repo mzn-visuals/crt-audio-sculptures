@@ -6109,11 +6109,6 @@
     const deviceList     = document.getElementById("connectDeviceList");
     const noDevicesMsg   = document.getElementById("connectNoDevices");
 
-    // References to main app elements (module scope, need to redeclare)
-    const audioEl        = document.querySelector("audio");
-    const seekBar        = document.getElementById("seekBar");
-    const volumeSlider   = document.getElementById("volumeSlider");
-
     // ── Show/hide panels ─────────────────────────────────────────────────────
     function showLogin()   { loginPanel.style.display=""; sessionPanel.style.display="none"; }
     function showSession(username) {
@@ -6214,7 +6209,9 @@
     let lastBroadcastSig = null;
 
     function broadcastState() {
-      if (!currentUser || applyingRemote || !audioEl) return;
+      if (!currentUser || applyingRemote) return;
+      const audioEl = document.querySelector("audio");
+      if (!audioEl) return;
       // Only broadcast if we currently own audio
       if (lastAudioOwner !== deviceId) {
         console.log('[CRT Connect] Not broadcasting - not the owner. Owner:', lastAudioOwner, 'My device:', deviceId);
@@ -6263,6 +6260,7 @@
       if (!weOwnAudio) {
         console.log('[CRT Connect] Not the owner, updating UI only');
         // If we just lost ownership, pause audio locally
+        const audioEl = document.querySelector("audio");
         if (prevOwner === deviceId && audioEl && !audioEl.paused) {
           console.log('[CRT Connect] Lost ownership, pausing local audio');
           autoPaused = true;
@@ -6327,18 +6325,13 @@
           pauseIconCard.style.display = state.playing ? "" : "none";
         }
 
-        // Update volume slider
-        const volumeSlider = document.getElementById('volumeSlider');
-        if (volumeSlider && state.volume !== undefined) {
-          volumeSlider.value = Math.round(state.volume * 100);
-        }
-
         return;
       }
 
       // We are (or just became) the audio owner
       applyingRemote = true;
       try {
+        const audioEl = document.querySelector("audio");
         if (state.volume !== undefined && audioEl) audioEl.volume = state.volume;
 
         if (justGotOwnership && state.trackId) {
@@ -6438,6 +6431,7 @@
         return; // not our job
       }
       console.log('[CRT Connect] Executing command:', cmd.type, cmd.value);
+      const audioEl = document.querySelector("audio");
       switch (cmd.type) {
         case 'PLAY':
           console.log('[CRT Connect] Executing PLAY command');
@@ -6579,6 +6573,7 @@
       console.log('[CRT Connect] Current Firebase state:', existing);
 
       // If WE are the current audio owner, grab live position from audioEl
+      const audioEl = document.querySelector("audio");
       const weAreOwner = lastAudioOwner === deviceId;
       const livePosition = weAreOwner && audioEl && Number.isFinite(audioEl.currentTime)
         ? audioEl.currentTime : (existing.position || 0);
