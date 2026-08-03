@@ -1718,7 +1718,7 @@
             ═══════════════════════════════════════════════════════════ -->
             <details class="group collapsible" id="sectionConnect" data-section="connect">
               <summary class="groupSummary">Connect</summary>
-              <div class="groupContent" id="connectContent" style="width:100%;">
+              <div class="groupContent" id="connectContent" style="width:100%;flex-direction:column;align-items:stretch;">
 
                 <!-- NOT LOGGED IN -->
                 <div id="connectLogin">
@@ -6226,25 +6226,37 @@
 
     async function transferAudioTo(targetDeviceId) {
       if (!currentUser) return;
-      // Save current state first
+
+      // Always read current playback state from Firebase so any device
+      // can initiate a transfer, not just the one currently owning audio.
+      const snap = await get(ref(db, `users/${currentUser}/state`));
+      const existing = snap.exists() ? snap.val() : {};
+
+      // If WE are the current audio owner, grab live position from audioEl
+      const weAreOwner = lastAudioOwner === deviceId;
+      const livePosition = weAreOwner && audioEl && Number.isFinite(audioEl.currentTime)
+        ? audioEl.currentTime : (existing.position || 0);
+      const liveVolume  = weAreOwner && audioEl ? audioEl.volume : (existing.volume ?? 1);
+      const livePlaying = weAreOwner && audioEl ? !audioEl.paused : (existing.playing ?? false);
+
       const state = {
-        trackId:    window.__currentStreamTrack?.id    || null,
-        title:      window.__currentStreamTrack?.title || null,
-        artist:     window.__currentStreamTrack?.artist|| null,
-        picUrl:     window.__currentStreamTrack?.picUrl|| null,
-        position:   audioEl.currentTime,
-        playing:    !audioEl.paused,
-        volume:     audioEl.volume,
+        trackId:    existing.trackId || null,
+        title:      existing.title   || null,
+        artist:     existing.artist  || null,
+        picUrl:     existing.picUrl  || null,
+        position:   livePosition,
+        playing:    livePlaying,
+        volume:     liveVolume,
         audioOwner: targetDeviceId,
         updatedBy:  deviceId,
         updatedAt:  Date.now()
       };
-      // Pause ourselves
-      audioEl.pause();
-      // Write state with new owner
+
+      // Pause ourselves if we currently own audio
+      if (weAreOwner && audioEl) audioEl.pause();
+
+      // Write new state — target device listener picks this up and loads track
       await set(ref(db, `users/${currentUser}/state`), state);
-      // Send transfer command
-      await sendCommand("TRANSFER_AUDIO", targetDeviceId);
     }
 
     // ── Hook into existing CRT controls ──────────────────────────────────────
