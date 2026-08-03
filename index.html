@@ -6308,10 +6308,7 @@
           if (pillSeekScrub) pillSeekScrub.value = pct;
         }
 
-        // Update pill now-playing info
-        const pillTitle = document.getElementById('pillTitle');
-        const pillArtist = document.getElementById('pillArtist');
-        const pillThumb = document.getElementById('pillThumb');
+        // Update pill now-playing info (already declared above)
         if (pillTitle && state.title && state.title !== pillTitle.textContent) pillTitle.textContent = state.title;
         if (pillArtist && state.artist !== undefined && state.artist !== pillArtist.textContent) pillArtist.textContent = state.artist || '';
         if (pillThumb && state.picUrl) { pillThumb.src = state.picUrl; pillThumb.style.display = ''; }
