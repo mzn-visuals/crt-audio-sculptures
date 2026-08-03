@@ -2159,25 +2159,14 @@
         const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
         const isConnected = window.__crtConnect && lastAudioOwner !== null;
 
-        // If connected and not owner, send commands based on Firebase state
+        // If connected and not owner, send command based on current UI state
         if (isConnected && !isOwner) {
-          // Get current playing state from Firebase
-          const currentUser = localStorage.getItem("crt_connect_username");
-          if (currentUser && window.__crtConnect && window.__crtConnect.sendCommand && window.__crtConnect.getDb) {
-            // Get the current state from Firebase to determine if we should play or pause
-            const { get, ref } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js");
-            const db = window.__crtConnect.getDb();
-            const snap = await get(ref(db, `users/${currentUser}/state`));
-            if (snap.exists()) {
-              const state = snap.val();
-              const isActuallyPlaying = state.playing === true;
-              // Send the opposite command
-              if (isActuallyPlaying) {
-                window.__crtConnect.sendCommand("PAUSE");
-              } else {
-                window.__crtConnect.sendCommand("PLAY");
-              }
-            }
+          const playIcon = document.getElementById('playIcon');
+          const isPaused = playIcon && playIcon.style.display !== "none";
+          if (isPaused) {
+            window.__crtConnect.sendCommand("PLAY");
+          } else {
+            window.__crtConnect.sendCommand("PAUSE");
           }
           return;
         }
@@ -6471,7 +6460,6 @@
           break;
         case 'MUTE':
           console.log('[CRT Connect] Executing MUTE command');
-          const audioEl = document.querySelector("audio");
           if (audioEl) {
             // Toggle between 0 and previous volume
             if (audioEl.volume === 0) {
