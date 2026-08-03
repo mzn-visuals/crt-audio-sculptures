@@ -2138,30 +2138,39 @@
     // since both route through the same <audio> element. ----
     playPauseBtn.addEventListener("click", async () => {
       try {
+        // CRT Connect: check ownership first
+        const deviceId = localStorage.getItem("crt_connect_device_id");
+        const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
+        const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
+        const isConnected = window.__crtConnect && lastAudioOwner !== null;
+
+        // If connected and not owner, send commands regardless of local audio state
+        if (isConnected && !isOwner) {
+          ensureAudio();
+          if (audioCtx.state === "suspended") await audioCtx.resume();
+
+          if (audioEl.paused) {
+            if (window.__crtConnect.sendCommand) {
+              window.__crtConnect.sendCommand("PLAY");
+            }
+          } else {
+            if (window.__crtConnect.sendCommand) {
+              window.__crtConnect.sendCommand("PAUSE");
+            }
+          }
+          return;
+        }
+
+        // Normal playback when owner or not connected
         if (!audioEl.src) { setStatus("choose a file or search first", false); return; }
         ensureAudio();
         if (audioCtx.state === "suspended") await audioCtx.resume();
 
-        // CRT Connect: check ownership
-        const deviceId = localStorage.getItem("crt_connect_device_id");
-        const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
-        const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
-
         if (audioEl.paused) {
-          if (!isOwner && window.__crtConnect && window.__crtConnect.sendCommand) {
-            // Send PLAY command to owner
-            window.__crtConnect.sendCommand("PLAY");
-            return;
-          }
           await audioEl.play();
           setPlayPauseIcon(true);
           setStatus(isLocalFileMode ? "playing file" : "streaming", true);
         } else {
-          if (!isOwner && window.__crtConnect && window.__crtConnect.sendCommand) {
-            // Send PAUSE command to owner
-            window.__crtConnect.sendCommand("PAUSE");
-            return;
-          }
           audioEl.pause();
           setPlayPauseIcon(false);
           setStatus(isLocalFileMode ? "paused" : "paused", false);
@@ -2219,17 +2228,26 @@
     }
 
     volumeSlider.addEventListener("input", () => {
+      // CRT Connect: check ownership first
+      const deviceId = localStorage.getItem("crt_connect_device_id");
+      const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
+      const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
+      const isConnected = window.__crtConnect && lastAudioOwner !== null;
+
+      if (isConnected && !isOwner) {
+        // Send volume command to owner
+        if (window.__crtConnect && window.__crtConnect.sendCommand) {
+          const volume = (+volumeSlider.value) / 100;
+          window.__crtConnect.sendCommand("VOLUME", volume);
+        }
+        flashVolPercent(Math.round(+volumeSlider.value));
+        return;
+      }
+
+      // Normal volume change when owner or not connected
       if (isMuted && +volumeSlider.value > 0) isMuted = false;
       applyVolume();
       flashVolPercent(Math.round(+volumeSlider.value));
-      // CRT Connect: send volume command if not owner
-      if (window.__crtConnect && window.__crtConnect.sendCommand) {
-        const deviceId = localStorage.getItem("crt_connect_device_id");
-        const lastAudioOwner = window.__crtConnect.getAudioOwner();
-        if (lastAudioOwner && deviceId && lastAudioOwner !== deviceId) {
-          window.__crtConnect.sendCommand("VOLUME", audioEl.volume);
-        }
-      }
     });
 
     volumeControl.addEventListener("wheel", (e) => {
@@ -3107,16 +3125,31 @@
       }
     });
     seekBar.addEventListener("change", () => {
-      if (Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
-        audioEl.currentTime = (seekBar.value / 100) * audioEl.duration;
-        // CRT Connect: send seek command if not owner
+      // CRT Connect: check ownership first
+      const deviceId = localStorage.getItem("crt_connect_device_id");
+      const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
+      const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
+      const isConnected = window.__crtConnect && lastAudioOwner !== null;
+
+      if (isConnected && !isOwner) {
+        // Send seek command to owner, calculate position from seek bar
         if (window.__crtConnect && window.__crtConnect.sendCommand) {
-          const deviceId = localStorage.getItem("crt_connect_device_id");
-          const lastAudioOwner = window.__crtConnect.getAudioOwner();
-          if (lastAudioOwner && deviceId && lastAudioOwner !== deviceId) {
-            window.__crtConnect.sendCommand("SEEK", audioEl.currentTime);
+          // We need to calculate the seek position from the current state
+          // Since we don't have local audio, we'll send the percentage and let owner handle it
+          const seekPercent = seekBar.value / 100;
+          // Get current duration from Firebase state
+          if (window.__crtConnect && window.__crtConnect.sendCommand) {
+            // Send the percentage, owner will calculate actual position
+            window.__crtConnect.sendCommand("SEEK_PERCENT", seekPercent);
           }
         }
+        seekDragging = false;
+        return;
+      }
+
+      // Normal seek when owner or not connected
+      if (Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
+        audioEl.currentTime = (seekBar.value / 100) * audioEl.duration;
       }
       seekDragging = false;
     });
@@ -6291,6 +6324,12 @@
         case 'SEEK':
           console.log('[CRT Connect] Executing SEEK command to:', cmd.value);
           if (audioEl && Number.isFinite(cmd.value)) audioEl.currentTime = cmd.value;
+          break;
+        case 'SEEK_PERCENT':
+          console.log('[CRT Connect] Executing SEEK_PERCENT command to:', cmd.value);
+          if (audioEl && Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
+            audioEl.currentTime = cmd.value * audioEl.duration;
+          }
           break;
         case 'VOLUME':
           console.log('[CRT Connect] Executing VOLUME command to:', cmd.value);
