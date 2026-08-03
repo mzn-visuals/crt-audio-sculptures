@@ -6272,71 +6272,69 @@
           autoPaused = true;
           audioEl.pause();
         }
+      }
 
-        // Mirror: update both pill display AND main player UI
-        const pillTitle  = document.getElementById('pillTitle');
-        const pillArtist = document.getElementById('pillArtist');
-        const pillThumb  = document.getElementById('pillThumb');
-        if (pillTitle  && state.title  && state.title  !== pillTitle.textContent)  pillTitle.textContent  = state.title;
-        if (pillArtist && state.artist !== undefined && state.artist !== pillArtist.textContent) pillArtist.textContent = state.artist || '';
-        if (pillThumb  && state.picUrl) { pillThumb.src = state.picUrl; pillThumb.style.display = ''; }
+      // Always update UI (both owner and non-owner need this)
+      // Mirror: update both pill display AND main player UI
+      const pillTitle  = document.getElementById('pillTitle');
+      const pillArtist = document.getElementById('pillArtist');
+      const pillThumb  = document.getElementById('pillThumb');
+      if (pillTitle  && state.title  && state.title  !== pillTitle.textContent)  pillTitle.textContent  = state.title;
+      if (pillArtist && state.artist !== undefined && state.artist !== pillArtist.textContent) pillArtist.textContent = state.artist || '';
+      if (pillThumb  && state.picUrl) { pillThumb.src = state.picUrl; pillThumb.style.display = ''; }
 
-        // Also update main player UI elements
-        const nowPlayingTitle = document.getElementById('nowPlayingTitle');
-        const nowPlayingArtist = document.getElementById('nowPlayingArtist');
-        const nowPlayingThumb = document.getElementById('nowPlayingThumb');
-        if (nowPlayingTitle && state.title && state.title !== nowPlayingTitle.textContent) nowPlayingTitle.textContent = state.title;
-        if (nowPlayingArtist && state.artist !== undefined && state.artist !== nowPlayingArtist.textContent) nowPlayingArtist.textContent = state.artist || '';
-        if (nowPlayingThumb && state.picUrl) {
-          nowPlayingThumb.src = state.picUrl;
-          nowPlayingThumb.classList.add('visible');
-        }
+      // Also update main player UI elements
+      const nowPlayingTitle = document.getElementById('nowPlayingTitle');
+      const nowPlayingArtist = document.getElementById('nowPlayingArtist');
+      const nowPlayingThumb = document.getElementById('nowPlayingThumb');
+      if (nowPlayingTitle && state.title && state.title !== nowPlayingTitle.textContent) nowPlayingTitle.textContent = state.title;
+      if (nowPlayingArtist && state.artist !== undefined && state.artist !== nowPlayingArtist.textContent) nowPlayingArtist.textContent = state.artist || '';
+      if (nowPlayingThumb && state.picUrl) {
+        nowPlayingThumb.src = state.picUrl;
+        nowPlayingThumb.classList.add('visible');
+      }
 
-        // Update seek bar position
-        const seekBar = document.getElementById('seekBar');
-        const seekTime = document.getElementById('seekTime');
-        const seekDuration = document.getElementById('seekDuration');
-        if (seekBar && state.position !== undefined && Number.isFinite(state.duration) && state.duration > 0) {
-          const pct = (state.position / state.duration) * 100;
-          seekBar.value = pct;
-          if (seekTime) seekTime.textContent = fmtTime(state.position);
-          if (seekDuration) seekDuration.textContent = fmtTime(state.duration);
-        }
+      // Update seek bar position
+      const seekBar = document.getElementById('seekBar');
+      const seekTime = document.getElementById('seekTime');
+      const seekDuration = document.getElementById('seekDuration');
+      if (seekBar && state.position !== undefined && Number.isFinite(state.duration) && state.duration > 0) {
+        const pct = (state.position / state.duration) * 100;
+        seekBar.value = pct;
+        if (seekTime) seekTime.textContent = fmtTime(state.position);
+        if (seekDuration) seekDuration.textContent = fmtTime(state.duration);
+      }
 
-        // Update pill seek fill
-        const pillSeekFill = document.getElementById('pillSeekFill');
-        const pillSeekScrub = document.getElementById('pillSeekScrub');
-        if (pillSeekFill && state.position !== undefined && Number.isFinite(state.duration) && state.duration > 0) {
-          const pct = (state.position / state.duration) * 100;
-          pillSeekFill.style.width = pct + "%";
-          if (pillSeekScrub) pillSeekScrub.value = pct;
-        }
+      // Update pill seek fill
+      const pillSeekFill = document.getElementById('pillSeekFill');
+      const pillSeekScrub = document.getElementById('pillSeekScrub');
+      if (pillSeekFill && state.position !== undefined && Number.isFinite(state.duration) && state.duration > 0) {
+        const pct = (state.position / state.duration) * 100;
+        pillSeekFill.style.width = pct + "%";
+        if (pillSeekScrub) pillSeekScrub.value = pct;
+      }
 
-        // Update volume slider
-        const volumeSlider = document.getElementById('volumeSlider');
-        if (volumeSlider && state.volume !== undefined) {
-          volumeSlider.value = Math.round(state.volume * 100);
-        }
+      // Update volume slider
+      const volumeSlider = document.getElementById('volumeSlider');
+      if (volumeSlider && state.volume !== undefined) {
+        volumeSlider.value = Math.round(state.volume * 100);
+      }
 
-        // Update pill now-playing info (already declared above)
-        if (pillTitle && state.title && state.title !== pillTitle.textContent) pillTitle.textContent = state.title;
-        if (pillArtist && state.artist !== undefined && state.artist !== pillArtist.textContent) pillArtist.textContent = state.artist || '';
-        if (pillThumb && state.picUrl) { pillThumb.src = state.picUrl; pillThumb.style.display = ''; }
+      // Update play/pause icon (both wing and card)
+      const playIcon = document.getElementById('playIcon');
+      const pauseIcon = document.getElementById('pauseIcon');
+      if (playIcon && pauseIcon) {
+        playIcon.style.display = state.playing ? "none" : "";
+        pauseIcon.style.display = state.playing ? "" : "none";
+      }
+      const playIconCard = document.getElementById('playIconCard');
+      const pauseIconCard = document.getElementById('pauseIconCard');
+      if (playIconCard && pauseIconCard) {
+        playIconCard.style.display = state.playing ? "none" : "";
+        pauseIconCard.style.display = state.playing ? "" : "none";
+      }
 
-        // Update play/pause icon (both wing and card)
-        const playIcon = document.getElementById('playIcon');
-        const pauseIcon = document.getElementById('pauseIcon');
-        if (playIcon && pauseIcon) {
-          playIcon.style.display = state.playing ? "none" : "";
-          pauseIcon.style.display = state.playing ? "" : "none";
-        }
-        const playIconCard = document.getElementById('playIconCard');
-        const pauseIconCard = document.getElementById('pauseIconCard');
-        if (playIconCard && pauseIconCard) {
-          playIconCard.style.display = state.playing ? "none" : "";
-          pauseIconCard.style.display = state.playing ? "" : "none";
-        }
-
+      if (!weOwnAudio) {
         return;
       }
 
@@ -6473,21 +6471,18 @@
           break;
         case 'MUTE':
           console.log('[CRT Connect] Executing MUTE command');
-          // Toggle wing mute state directly
-          const volScrub = document.getElementById('volScrub');
-          const volPct = document.getElementById('volPct');
-          if (volScrub && volPct) {
-            if (volScrub.value == 0) {
-              // Unmute
-              volScrub.value = 50;
-              volPct.textContent = "50%";
+          const audioEl = document.querySelector("audio");
+          if (audioEl) {
+            // Toggle between 0 and previous volume
+            if (audioEl.volume === 0) {
+              audioEl.volume = window.__crtLastVolume || 1;
             } else {
-              // Mute
-              volScrub.value = 0;
-              volPct.textContent = "0%";
+              window.__crtLastVolume = audioEl.volume;
+              audioEl.volume = 0;
             }
-            // Trigger the input event to apply the volume
-            volScrub.dispatchEvent(new Event('input'));
+            // Update UI
+            const vs = document.getElementById('volumeSlider');
+            if (vs) vs.value = Math.round(audioEl.volume * 100);
           }
           break;
         case 'NEXT':
@@ -6642,6 +6637,7 @@
       };
 
       // Owner: broadcast state. Non-owner: send command.
+      const audioEl = document.querySelector("audio");
       audioEl?.addEventListener("play", () => {
         if (applyingRemote) return;
         console.log('[CRT Connect] Audio play event, current owner:', lastAudioOwner, 'my device:', deviceId);
