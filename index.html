@@ -6055,7 +6055,7 @@
     function broadcastState() {
       if (!currentUser || applyingRemote || !audioEl) return;
       // Only broadcast if we currently own audio
-      if (lastAudioOwner !== deviceId && lastAudioOwner !== null) return;
+      if (lastAudioOwner !== deviceId) return;
       const state = {
         trackId:    window.__currentStreamTrack?.id    || null,
         title:      window.__currentStreamTrack?.title || null,
@@ -6204,6 +6204,10 @@
         if (cmd?.from === deviceId) remove(ref(db, `users/${currentUser}/commands/${cmdId}`)).catch(() => {});
         return;
       }
+      // If no owner exists, claim ownership and execute command
+      if (lastAudioOwner === null) {
+        lastAudioOwner = deviceId;
+      }
       // Only the current audio owner should execute commands
       if (lastAudioOwner !== deviceId) {
         return; // not our job
@@ -6273,8 +6277,8 @@
       noDevicesMsg.style.display = "none";
 
       // Use lastAudioOwner which is kept in sync by the state listener
-      // Default to this device if no owner has been set yet
-      const actualAudioOwner = lastAudioOwner || deviceId;
+      // Don't default to this device - if no owner, no device should be marked as owner
+      const actualAudioOwner = lastAudioOwner;
 
       // Sort: this device first, then others
       const sorted = [
@@ -6345,12 +6349,20 @@
 
     // ── Hook into existing CRT controls ──────────────────────────────────────
     setTimeout(() => {
-      const isOwner = () => lastAudioOwner === deviceId || lastAudioOwner === null;
+      const isOwner = () => lastAudioOwner === deviceId;
+      const claimOwnership = () => {
+        if (lastAudioOwner === null || lastAudioOwner === deviceId) {
+          lastAudioOwner = deviceId;
+          return true;
+        }
+        return false;
+      };
 
       // Owner: broadcast state. Non-owner: send command.
       audioEl?.addEventListener("play", () => {
         if (applyingRemote) return;
-        if (isOwner()) broadcastState();
+        // Claim ownership if no current owner, then broadcast state
+        if (claimOwnership() || isOwner()) broadcastState();
         else sendCommand("PLAY");
       });
       audioEl?.addEventListener("pause", () => {
