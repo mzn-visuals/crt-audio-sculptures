@@ -1713,6 +1713,56 @@
               </div>
             </details>
 
+            <!-- ═══════════════════════════════════════════════════════════
+                 CRT CONNECT — optional multi-device sync (opt-in only)
+            ═══════════════════════════════════════════════════════════ -->
+            <details class="group collapsible" id="sectionConnect" data-section="connect">
+              <summary class="groupSummary">Connect</summary>
+              <div class="groupContent" id="connectContent" style="min-width:min(100%,480px);">
+
+                <!-- NOT LOGGED IN -->
+                <div id="connectLogin">
+                  <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.5;">
+                    Sign in to sync playback across your devices — same track, position, and volume everywhere. Completely optional.
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:8px;width:100%;">
+                    <input id="connectUser" type="text" placeholder="Username" autocomplete="off" style="width:100%;box-sizing:border-box;" />
+                    <input id="connectPass" type="password" placeholder="Password" autocomplete="off" style="width:100%;box-sizing:border-box;" />
+                    <div style="display:flex;gap:8px;">
+                      <button id="connectSignIn" type="button" style="flex:1;">Sign in</button>
+                      <button id="connectRegister" type="button" class="secondary" style="flex:1;">Register</button>
+                    </div>
+                    <div id="connectLoginError" style="font-size:11px;color:#ff6b6b;display:none;"></div>
+                  </div>
+                </div>
+
+                <!-- LOGGED IN -->
+                <div id="connectSession" style="display:none;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                      <span style="width:7px;height:7px;border-radius:50%;background:#4caf50;display:inline-block;"></span>
+                      <span id="connectUsername" style="font-size:12px;font-family:ui-monospace,monospace;color:var(--text);"></span>
+                    </div>
+                    <button id="connectLogout" type="button" class="secondary" style="font-size:11px;padding:3px 10px;">Sign out</button>
+                  </div>
+
+                  <!-- Device name -->
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+                    <span style="font-size:11px;color:var(--muted);white-space:nowrap;">This device:</span>
+                    <input id="connectDeviceName" type="text" style="flex:1;font-size:11px;" />
+                    <button id="connectSaveName" type="button" class="secondary" style="font-size:11px;padding:3px 10px;">Save</button>
+                  </div>
+
+                  <!-- Devices list -->
+                  <div style="font-size:11px;font-family:ui-monospace,monospace;color:rgba(255,255,255,.5);margin-bottom:6px;letter-spacing:.04em;">DEVICES</div>
+                  <div id="connectDeviceList" style="display:flex;flex-direction:column;gap:6px;"></div>
+
+                  <div id="connectNoDevices" style="font-size:11px;color:var(--muted);display:none;margin-top:4px;">No other devices online. Open CRT on another device and sign in with the same account.</div>
+                </div>
+
+              </div>
+            </details>
+
           </div><!-- /#hudBody -->
         </div><!-- /.card-content -->
       </div><!-- /.morph -->
@@ -2792,9 +2842,12 @@
           picUrl: track.pic || null,
           id:     track.id,
         };
+        window.__currentStreamTrack = currentStreamTrack; // exposed for CRT Connect
         nowPlayingTitle.textContent  = track.name   || "—";
         nowPlayingArtist.textContent = track.artist  || "—";
         updatePillNowPlaying(track.name || "streaming", track.artist || "", track.pic || null);
+        // Broadcast new track to connected devices
+        setTimeout(() => window.__crtConnect?.broadcastState(), 500);
 
         if (audioCtx.state === "suspended") await audioCtx.resume();
         await audioEl.play();
@@ -5824,6 +5877,384 @@
       composer.render();
     }
     animate();
+  </script>
+
+  <!-- CRT Connect: optional Firebase-based multi-device sync -->
+  <script type="module">
+    import { initializeApp }          from "https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js";
+    import { getDatabase, ref, set, get, update, onValue, push, remove, serverTimestamp, off }
+                                       from "https://www.gstatic.com/firebasejs/12.17.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey:            "AIzaSyDntobg9DvQYqD6LZr44IhbqtRe-y6sOP4",
+      authDomain:        "crt-audio-connect.firebaseapp.com",
+      databaseURL:       "https://crt-audio-connect-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId:         "crt-audio-connect",
+      storageBucket:     "crt-audio-connect.firebasestorage.app",
+      messagingSenderId: "3638422548",
+      appId:             "1:3638422548:web:c06ce604edd9c386bc4b01"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db  = getDatabase(app);
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    async function sha256(str) {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
+    }
+
+    function detectDeviceName() {
+      const ua = navigator.userAgent;
+      if (/iPhone/i.test(ua))  return "iPhone";
+      if (/iPad/i.test(ua))    return "iPad";
+      if (/Android/i.test(ua)) return "Android";
+      if (/Mac/i.test(ua))     return "Mac";
+      if (/Windows/i.test(ua)) return "Windows PC";
+      return "Unknown Device";
+    }
+
+    // ── Persistent device ID ─────────────────────────────────────────────────
+    let deviceId = localStorage.getItem("crt_connect_device_id");
+    if (!deviceId) {
+      deviceId = crypto.randomUUID();
+      localStorage.setItem("crt_connect_device_id", deviceId);
+    }
+
+    // ── State ────────────────────────────────────────────────────────────────
+    let currentUser    = null;   // username string
+    let heartbeatTimer = null;
+    let stateListener  = null;
+    let cmdListener    = null;
+    let devicesListener= null;
+    let applyingRemote = false;  // guard: don't re-broadcast changes we received
+    let lastBroadcastedState = null;
+
+    // ── DOM refs ─────────────────────────────────────────────────────────────
+    const loginPanel     = document.getElementById("connectLogin");
+    const sessionPanel   = document.getElementById("connectSession");
+    const userInput      = document.getElementById("connectUser");
+    const passInput      = document.getElementById("connectPass");
+    const signInBtn      = document.getElementById("connectSignIn");
+    const registerBtn    = document.getElementById("connectRegister");
+    const loginError     = document.getElementById("connectLoginError");
+    const logoutBtn      = document.getElementById("connectLogout");
+    const usernameLabel  = document.getElementById("connectUsername");
+    const deviceNameInput= document.getElementById("connectDeviceName");
+    const saveNameBtn    = document.getElementById("connectSaveName");
+    const deviceList     = document.getElementById("connectDeviceList");
+    const noDevicesMsg   = document.getElementById("connectNoDevices");
+
+    // References to main app elements
+    const audioEl        = document.querySelector("audio");
+    const seekBar        = document.getElementById("seekBar");
+    const volumeSlider   = document.getElementById("volumeSlider");
+
+    // ── Show/hide panels ─────────────────────────────────────────────────────
+    function showLogin()   { loginPanel.style.display=""; sessionPanel.style.display="none"; }
+    function showSession(username) {
+      loginPanel.style.display="none"; sessionPanel.style.display="";
+      usernameLabel.textContent = username;
+      const savedName = localStorage.getItem("crt_connect_device_name") || detectDeviceName();
+      deviceNameInput.value = savedName;
+    }
+    function setLoginError(msg) {
+      loginError.textContent = msg;
+      loginError.style.display = msg ? "" : "none";
+    }
+
+    // ── Auth ─────────────────────────────────────────────────────────────────
+    async function signIn(username, password) {
+      setLoginError("");
+      const userRef  = ref(db, `users/${username}`);
+      const snapshot = await get(userRef);
+      if (!snapshot.exists()) { setLoginError("User not found."); return; }
+      const data     = snapshot.val();
+      const hash     = await sha256(password);
+      if (data.password !== hash) { setLoginError("Wrong password."); return; }
+      await startSession(username);
+    }
+
+    async function register(username, password) {
+      setLoginError("");
+      if (!username || !password) { setLoginError("Enter a username and password."); return; }
+      if (username.includes(".") || username.includes("#") || username.includes("$") || username.includes("[") || username.includes("]")) {
+        setLoginError("Username can't contain . # $ [ ]"); return;
+      }
+      const userRef  = ref(db, `users/${username}`);
+      const snapshot = await get(userRef);
+      if (snapshot.exists()) { setLoginError("Username taken."); return; }
+      const hash = await sha256(password);
+      await set(ref(db, `users/${username}`), { password: hash });
+      await startSession(username);
+    }
+
+    async function startSession(username) {
+      currentUser = username;
+      localStorage.setItem("crt_connect_user", username);
+      showSession(username);
+      await registerDevice();
+      startHeartbeat();
+      startListeners();
+    }
+
+    function signOut() {
+      if (currentUser && deviceId) {
+        update(ref(db, `users/${currentUser}/devices/${deviceId}`), { isOnline: false });
+      }
+      stopListeners();
+      clearInterval(heartbeatTimer);
+      currentUser = null;
+      localStorage.removeItem("crt_connect_user");
+      showLogin();
+    }
+
+    // ── Device registration & heartbeat ──────────────────────────────────────
+    async function registerDevice() {
+      const name = localStorage.getItem("crt_connect_device_name") || detectDeviceName();
+      await set(ref(db, `users/${currentUser}/devices/${deviceId}`), {
+        name,
+        lastSeen: Date.now(),
+        isOnline: true
+      });
+    }
+
+    function startHeartbeat() {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = setInterval(() => {
+        if (!currentUser) return;
+        update(ref(db, `users/${currentUser}/devices/${deviceId}`), {
+          lastSeen: Date.now(),
+          isOnline: true
+        });
+      }, 30_000);
+    }
+
+    window.addEventListener("beforeunload", () => {
+      if (currentUser) {
+        update(ref(db, `users/${currentUser}/devices/${deviceId}`), { isOnline: false });
+      }
+    });
+
+    // ── Broadcast playback state to Firebase ─────────────────────────────────
+    function broadcastState() {
+      if (!currentUser || applyingRemote || !audioEl) return;
+      const state = {
+        trackId:    window.__currentStreamTrack?.id    || null,
+        title:      window.__currentStreamTrack?.title || null,
+        artist:     window.__currentStreamTrack?.artist|| null,
+        picUrl:     window.__currentStreamTrack?.picUrl|| null,
+        position:   audioEl.currentTime,
+        playing:    !audioEl.paused,
+        volume:     audioEl.volume,
+        audioOwner: deviceId,
+        updatedBy:  deviceId,
+        updatedAt:  Date.now()
+      };
+      // Throttle: only write if something meaningful changed
+      const sig = `${state.trackId}|${Math.round(state.position)}|${state.playing}|${state.volume}`;
+      if (sig === lastBroadcastedState) return;
+      lastBroadcastedState = sig;
+      set(ref(db, `users/${currentUser}/state`), state).catch(()=>{});
+    }
+
+    // ── Apply remote state coming FROM Firebase ───────────────────────────────
+    async function applyRemoteState(state) {
+      if (!state || state.updatedBy === deviceId) return; // ignore our own writes
+      if (state.audioOwner !== deviceId) {
+        // We are a controller/mirror — sync UI but don't play audio here
+        // Update pill display if track changed
+        if (state.title) {
+          const pillTitle  = document.getElementById("pillTitle");
+          const pillArtist = document.getElementById("pillArtist");
+          const pillThumb  = document.getElementById("pillThumb");
+          if (pillTitle  && state.title  !== pillTitle.textContent)  pillTitle.textContent  = state.title;
+          if (pillArtist && state.artist !== pillArtist.textContent) pillArtist.textContent = state.artist || "";
+          if (pillThumb  && state.picUrl) { pillThumb.src = state.picUrl; pillThumb.style.display=""; }
+        }
+        // Keep seek bar in sync
+        if (seekBar && Number.isFinite(audioEl?.duration) && audioEl.duration > 0) {
+          const pct = (state.position / audioEl.duration) * 100;
+          seekBar.value = pct;
+        }
+        return;
+      }
+      // We ARE the audio owner — apply everything
+      applyingRemote = true;
+      try {
+        if (state.volume !== undefined) audioEl.volume = state.volume;
+        if (state.playing && audioEl.paused)  { audioEl.play().catch(()=>{}); }
+        if (!state.playing && !audioEl.paused) { audioEl.pause(); }
+        if (state.position !== undefined && Math.abs(audioEl.currentTime - state.position) > 3) {
+          audioEl.currentTime = state.position;
+        }
+      } finally {
+        setTimeout(() => { applyingRemote = false; }, 500);
+      }
+    }
+
+    // ── Command: remote device sends a control action ─────────────────────────
+    async function sendCommand(type, value = null) {
+      if (!currentUser) return;
+      const cmdRef = push(ref(db, `users/${currentUser}/commands`));
+      await set(cmdRef, { type, value, from: deviceId, at: Date.now() });
+    }
+
+    async function handleCommand(cmdId, cmd) {
+      if (cmd.from === deviceId) return; // ignore our own
+      // Execute
+      switch (cmd.type) {
+        case "PLAY":    if (audioEl.paused)  audioEl.play().catch(()=>{});  break;
+        case "PAUSE":   if (!audioEl.paused) audioEl.pause();               break;
+        case "SEEK":    if (Number.isFinite(cmd.value)) audioEl.currentTime = cmd.value; break;
+        case "VOLUME":  if (Number.isFinite(cmd.value)) { audioEl.volume = cmd.value; if(volumeSlider) volumeSlider.value = Math.round(cmd.value*100); } break;
+        case "NEXT":    document.getElementById("nextBtn")?.click(); break;
+        case "PREV":    document.getElementById("prevBtn")?.click(); break;
+        case "TRANSFER_AUDIO":
+          if (cmd.value === deviceId) {
+            // We've been handed audio ownership — nothing extra needed,
+            // state listener will handle it
+          }
+          break;
+      }
+      // Remove command after processing
+      await remove(ref(db, `users/${currentUser}/commands/${cmdId}`));
+    }
+
+    // ── Firebase listeners ────────────────────────────────────────────────────
+    function startListeners() {
+      if (!currentUser) return;
+
+      // State sync
+      const stateRef = ref(db, `users/${currentUser}/state`);
+      stateListener = onValue(stateRef, snap => {
+        if (snap.exists()) applyRemoteState(snap.val());
+      });
+
+      // Commands
+      const cmdRef = ref(db, `users/${currentUser}/commands`);
+      cmdListener = onValue(cmdRef, snap => {
+        if (!snap.exists()) return;
+        snap.forEach(child => handleCommand(child.key, child.val()));
+      });
+
+      // Devices list for UI
+      const devRef = ref(db, `users/${currentUser}/devices`);
+      devicesListener = onValue(devRef, snap => renderDevices(snap.val() || {}));
+    }
+
+    function stopListeners() {
+      if (stateListener)   { off(ref(db, `users/${currentUser}/state`));    stateListener   = null; }
+      if (cmdListener)     { off(ref(db, `users/${currentUser}/commands`));  cmdListener     = null; }
+      if (devicesListener) { off(ref(db, `users/${currentUser}/devices`));   devicesListener = null; }
+    }
+
+    // ── Devices list UI ───────────────────────────────────────────────────────
+    function renderDevices(devicesObj) {
+      deviceList.innerHTML = "";
+      const others = Object.entries(devicesObj).filter(([id]) => id !== deviceId);
+      if (others.length === 0) {
+        noDevicesMsg.style.display = "";
+        return;
+      }
+      noDevicesMsg.style.display = "none";
+      others.forEach(([id, dev]) => {
+        const isOnline = dev.isOnline && (Date.now() - dev.lastSeen < 90_000);
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,.04);border-radius:6px;";
+        row.innerHTML = `
+          <span style="width:6px;height:6px;border-radius:50%;background:${isOnline?"#4caf50":"#555"};flex-shrink:0;"></span>
+          <span style="flex:1;font-size:12px;font-family:ui-monospace,monospace;color:${isOnline?"var(--text)":"var(--muted)"};">${dev.name || "Unknown"}</span>
+          ${isOnline ? `<button class="secondary" data-device-id="${id}" style="font-size:10px;padding:2px 8px;">Play here</button>` : ""}
+        `;
+        if (isOnline) {
+          row.querySelector("button").addEventListener("click", () => transferAudioTo(id));
+        }
+        deviceList.appendChild(row);
+      });
+    }
+
+    async function transferAudioTo(targetDeviceId) {
+      if (!currentUser) return;
+      // Save current state first
+      const state = {
+        trackId:    window.__currentStreamTrack?.id    || null,
+        title:      window.__currentStreamTrack?.title || null,
+        artist:     window.__currentStreamTrack?.artist|| null,
+        picUrl:     window.__currentStreamTrack?.picUrl|| null,
+        position:   audioEl.currentTime,
+        playing:    !audioEl.paused,
+        volume:     audioEl.volume,
+        audioOwner: targetDeviceId,
+        updatedBy:  deviceId,
+        updatedAt:  Date.now()
+      };
+      // Pause ourselves
+      audioEl.pause();
+      // Write state with new owner
+      await set(ref(db, `users/${currentUser}/state`), state);
+      // Send transfer command
+      await sendCommand("TRANSFER_AUDIO", targetDeviceId);
+    }
+
+    // ── Hook into existing CRT controls ──────────────────────────────────────
+    // We patch in after a short delay to ensure DOM+app are ready
+    setTimeout(() => {
+      // expose current track to our scope via a global the main script sets
+      // (we read window.__currentStreamTrack, which main script populates)
+
+      // Play/pause broadcast
+      audioEl?.addEventListener("play",  () => { if(!applyingRemote) sendCommand("PLAY");  broadcastState(); });
+      audioEl?.addEventListener("pause", () => { if(!applyingRemote) sendCommand("PAUSE"); broadcastState(); });
+
+      // Seek broadcast (on change, not input, to avoid spam)
+      seekBar?.addEventListener("change", () => {
+        if (!applyingRemote && audioEl) sendCommand("SEEK", audioEl.currentTime);
+        broadcastState();
+      });
+
+      // Volume broadcast
+      volumeSlider?.addEventListener("change", () => {
+        if (!applyingRemote) sendCommand("VOLUME", audioEl.volume);
+        broadcastState();
+      });
+
+      // Periodic position broadcast (every 5s) for seek sync
+      setInterval(broadcastState, 5000);
+    }, 1500);
+
+    // ── Expose broadcast so playTrack can call it ─────────────────────────────
+    window.__crtConnect = { broadcastState, sendCommand };
+
+    // ── UI event listeners ────────────────────────────────────────────────────
+    signInBtn.addEventListener("click", () => signIn(userInput.value.trim(), passInput.value));
+    registerBtn.addEventListener("click", () => register(userInput.value.trim(), passInput.value));
+    logoutBtn.addEventListener("click", signOut);
+
+    userInput.addEventListener("keydown", e => { if(e.key==="Enter") passInput.focus(); });
+    passInput.addEventListener("keydown", e => { if(e.key==="Enter") signInBtn.click(); });
+
+    saveNameBtn.addEventListener("click", async () => {
+      const name = deviceNameInput.value.trim();
+      if (!name || !currentUser) return;
+      localStorage.setItem("crt_connect_device_name", name);
+      await update(ref(db, `users/${currentUser}/devices/${deviceId}`), { name });
+      saveNameBtn.textContent = "Saved!";
+      setTimeout(() => saveNameBtn.textContent = "Save", 1500);
+    });
+
+    // ── Auto-restore session from localStorage ────────────────────────────────
+    const savedUser = localStorage.getItem("crt_connect_user");
+    if (savedUser) {
+      // Verify account still exists
+      get(ref(db, `users/${savedUser}`)).then(snap => {
+        if (snap.exists()) startSession(savedUser);
+        else { localStorage.removeItem("crt_connect_user"); showLogin(); }
+      }).catch(() => showLogin());
+    } else {
+      showLogin();
+    }
+
   </script>
 
   <!-- Tauri desktop app: F11 fullscreen toggle. No-op in browser/GitHub Pages context. -->
