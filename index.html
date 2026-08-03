@@ -5948,10 +5948,10 @@
     const deviceList     = document.getElementById("connectDeviceList");
     const noDevicesMsg   = document.getElementById("connectNoDevices");
 
-    // References to main app elements (already declared in main script, just reference them)
-    audioEl        = document.querySelector("audio");
-    seekBar        = document.getElementById("seekBar");
-    volumeSlider   = document.getElementById("volumeSlider");
+    // References to main app elements (module scope, need to redeclare)
+    const audioEl        = document.querySelector("audio");
+    const seekBar        = document.getElementById("seekBar");
+    const volumeSlider   = document.getElementById("volumeSlider");
 
     // ── Show/hide panels ─────────────────────────────────────────────────────
     function showLogin()   { loginPanel.style.display=""; sessionPanel.style.display="none"; }
