@@ -6040,8 +6040,13 @@
     });
 
     // ── Broadcast playback state to Firebase ─────────────────────────────────
+    // Only the audio owner broadcasts state. Non-owners only send commands.
+    let lastBroadcastSig = null;
+
     function broadcastState() {
       if (!currentUser || applyingRemote || !audioEl) return;
+      // Only broadcast if we currently own audio
+      if (lastAudioOwner !== deviceId && lastAudioOwner !== null) return;
       const state = {
         trackId:    window.__currentStreamTrack?.id    || null,
         title:      window.__currentStreamTrack?.title || null,
@@ -6054,132 +6059,160 @@
         updatedBy:  deviceId,
         updatedAt:  Date.now()
       };
-      // Throttle: only write if something meaningful changed
       const sig = `${state.trackId}|${Math.round(state.position)}|${state.playing}|${state.volume}`;
-      if (sig === lastBroadcastedState) return;
-      lastBroadcastedState = sig;
-      set(ref(db, `users/${currentUser}/state`), state).catch(()=>{});
+      if (sig === lastBroadcastSig) return;
+      lastBroadcastSig = sig;
+      set(ref(db, `users/${currentUser}/state`), state).catch(() => {});
     }
 
-    // ── Apply remote state coming FROM Firebase ───────────────────────────────
-    // Track the last audioOwner we saw so we can detect ownership transitions
+    // ── Apply remote state (received by non-owners + transfer target) ──────────
     let lastAudioOwner = null;
-    let lastLoadedTrackId = null;
+    let pendingTransferTrackId = null;
 
     async function applyRemoteState(state) {
-      if (!state || state.updatedBy === deviceId) return; // ignore our own writes
+      if (!state) return;
+      // Ignore our own non-transfer writes
+      if (state.updatedBy === deviceId && state.audioOwner === deviceId) return;
 
+      const prevOwner  = lastAudioOwner;
+      lastAudioOwner   = state.audioOwner;
       const weOwnAudio = state.audioOwner === deviceId;
-      const ownershipJustTransferredToUs = weOwnAudio && lastAudioOwner !== deviceId;
-      lastAudioOwner = state.audioOwner;
+      const justGotOwnership = weOwnAudio && prevOwner !== deviceId;
 
       if (!weOwnAudio) {
-        // Mirror mode — update pill UI only
-        if (state.title) {
-          const pillTitle  = document.getElementById("pillTitle");
-          const pillArtist = document.getElementById("pillArtist");
-          const pillThumb  = document.getElementById("pillThumb");
-          if (pillTitle  && state.title  !== pillTitle.textContent)  pillTitle.textContent  = state.title;
-          if (pillArtist && state.artist !== pillArtist.textContent) pillArtist.textContent = state.artist || "";
-          if (pillThumb  && state.picUrl) { pillThumb.src = state.picUrl; pillThumb.style.display=""; }
-        }
+        // Mirror: update pill display only
+        const pillTitle  = document.getElementById('pillTitle');
+        const pillArtist = document.getElementById('pillArtist');
+        const pillThumb  = document.getElementById('pillThumb');
+        if (pillTitle  && state.title  && state.title  !== pillTitle.textContent)  pillTitle.textContent  = state.title;
+        if (pillArtist && state.artist !== undefined && state.artist !== pillArtist.textContent) pillArtist.textContent = state.artist || '';
+        if (pillThumb  && state.picUrl) { pillThumb.src = state.picUrl; pillThumb.style.display = ''; }
         return;
       }
 
-      // We ARE the audio owner
+      // We are (or just became) the audio owner
       applyingRemote = true;
       try {
-        if (state.volume !== undefined) audioEl.volume = state.volume;
+        if (state.volume !== undefined && audioEl) audioEl.volume = state.volume;
 
-        if (ownershipJustTransferredToUs && state.trackId) {
-          // Full track load — ownership just moved to us
-          const track = {
-            id:     state.trackId,
-            name:   state.title  || "",
-            artist: state.artist || "",
-            pic:    state.picUrl || null,
-            album:  "",
-          };
-          lastLoadedTrackId = state.trackId;
-          const seekToPosition = state.position || 0;
-          // playTrack is exposed on window by the main script
+        if (justGotOwnership && state.trackId) {
+          // Transfer received — load and play the track
+          console.log('[CRT Connect] Audio transfer received, loading track:', state.trackId);
+          pendingTransferTrackId = state.trackId;
+          const seekPos = state.position || 0;
+          const shouldPlay = state.playing !== false;
+
           if (window.__crtPlayTrack) {
-            await window.__crtPlayTrack(track, { freshPick: false });
-            // Seek to correct position after load
-            audioEl.addEventListener("loadedmetadata", function onMeta() {
-              audioEl.removeEventListener("loadedmetadata", onMeta);
-              audioEl.currentTime = seekToPosition;
-              if (state.playing) audioEl.play().catch(()=>{});
-              else audioEl.pause();
-            }, { once: true });
+            const track = {
+              id:     state.trackId,
+              name:   state.title  || '',
+              artist: state.artist || '',
+              pic:    state.picUrl || null,
+              album:  '',
+            };
+            // playTrack resolves the stream and plays — then we seek
+            window.__crtPlayTrack(track, { freshPick: false }).then(() => {
+              // Wait for audio to have duration before seeking
+              function seekWhenReady() {
+                if (audioEl && Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
+                  audioEl.currentTime = seekPos;
+                  if (!shouldPlay) audioEl.pause();
+                } else {
+                  audioEl.addEventListener('loadedmetadata', () => {
+                    audioEl.currentTime = seekPos;
+                    if (!shouldPlay) audioEl.pause();
+                  }, { once: true });
+                }
+              }
+              seekWhenReady();
+            }).catch(err => console.warn('[CRT Connect] Transfer playTrack failed:', err));
           }
-        } else {
-          // Already owner, just sync play state + position drift
-          if (state.playing && audioEl.paused)   audioEl.play().catch(()=>{});
-          if (!state.playing && !audioEl.paused)  audioEl.pause();
-          if (state.position !== undefined && Math.abs(audioEl.currentTime - state.position) > 4) {
-            audioEl.currentTime = state.position;
+        } else if (!justGotOwnership) {
+          // Already owner — keep in sync with remote commands
+          if (audioEl) {
+            if (state.playing && audioEl.paused)  audioEl.play().catch(() => {});
+            if (!state.playing && !audioEl.paused) audioEl.pause();
+            if (state.position !== undefined && Math.abs(audioEl.currentTime - state.position) > 5) {
+              audioEl.currentTime = state.position;
+            }
           }
         }
       } finally {
-        setTimeout(() => { applyingRemote = false; }, 1000);
+        setTimeout(() => { applyingRemote = false; }, 1500);
       }
     }
 
-    // ── Command: remote device sends a control action ─────────────────────────
+    // ── Commands: non-owner sends, owner executes ──────────────────────────────
     async function sendCommand(type, value = null) {
       if (!currentUser) return;
+      // Non-owners send commands; owners broadcast state directly
+      if (lastAudioOwner === deviceId) return;
       const cmdRef = push(ref(db, `users/${currentUser}/commands`));
       await set(cmdRef, { type, value, from: deviceId, at: Date.now() });
     }
 
     async function handleCommand(cmdId, cmd) {
-      if (cmd.from === deviceId) return; // ignore our own
-      // Execute
+      if (!cmd || cmd.from === deviceId) {
+        // Still remove stale own commands
+        if (cmd?.from === deviceId) remove(ref(db, `users/${currentUser}/commands/${cmdId}`)).catch(() => {});
+        return;
+      }
+      // Only the current audio owner should execute commands
+      if (lastAudioOwner !== deviceId) {
+        return; // not our job
+      }
+      console.log('[CRT Connect] Executing command:', cmd.type, cmd.value);
       switch (cmd.type) {
-        case "PLAY":    if (audioEl.paused)  audioEl.play().catch(()=>{});  break;
-        case "PAUSE":   if (!audioEl.paused) audioEl.pause();               break;
-        case "SEEK":    if (Number.isFinite(cmd.value)) audioEl.currentTime = cmd.value; break;
-        case "VOLUME":  if (Number.isFinite(cmd.value)) { audioEl.volume = cmd.value; if(volumeSlider) volumeSlider.value = Math.round(cmd.value*100); } break;
-        case "NEXT":    document.getElementById("nextBtn")?.click(); break;
-        case "PREV":    document.getElementById("prevBtn")?.click(); break;
-        case "TRANSFER_AUDIO":
-          if (cmd.value === deviceId) {
-            // We've been handed audio ownership — nothing extra needed,
-            // state listener will handle it
+        case 'PLAY':
+          if (audioEl?.paused) audioEl.play().catch(() => {});
+          break;
+        case 'PAUSE':
+          if (audioEl && !audioEl.paused) audioEl.pause();
+          break;
+        case 'SEEK':
+          if (audioEl && Number.isFinite(cmd.value)) audioEl.currentTime = cmd.value;
+          break;
+        case 'VOLUME':
+          if (audioEl && Number.isFinite(cmd.value)) {
+            audioEl.volume = cmd.value;
+            const vs = document.getElementById('volumeSlider');
+            if (vs) vs.value = Math.round(cmd.value * 100);
           }
           break;
+        case 'NEXT': document.getElementById('nextBtn')?.click(); break;
+        case 'PREV': document.getElementById('prevBtn')?.click(); break;
       }
-      // Remove command after processing
-      await remove(ref(db, `users/${currentUser}/commands/${cmdId}`));
+      // Broadcast updated state after executing command
+      setTimeout(broadcastState, 200);
+      // Remove command
+      remove(ref(db, `users/${currentUser}/commands/${cmdId}`)).catch(() => {});
     }
 
     // ── Firebase listeners ────────────────────────────────────────────────────
     function startListeners() {
       if (!currentUser) return;
 
-      // State sync
       const stateRef = ref(db, `users/${currentUser}/state`);
       stateListener = onValue(stateRef, snap => {
         if (snap.exists()) applyRemoteState(snap.val());
       });
 
-      // Commands
       const cmdRef = ref(db, `users/${currentUser}/commands`);
       cmdListener = onValue(cmdRef, snap => {
         if (!snap.exists()) return;
         snap.forEach(child => handleCommand(child.key, child.val()));
       });
 
-      // Devices list for UI
       const devRef = ref(db, `users/${currentUser}/devices`);
       devicesListener = onValue(devRef, snap => renderDevices(snap.val() || {}));
     }
 
     function stopListeners() {
-      if (stateListener)   { off(ref(db, `users/${currentUser}/state`));    stateListener   = null; }
-      if (cmdListener)     { off(ref(db, `users/${currentUser}/commands`));  cmdListener     = null; }
-      if (devicesListener) { off(ref(db, `users/${currentUser}/devices`));   devicesListener = null; }
+      if (currentUser) {
+        if (stateListener)   { off(ref(db, `users/${currentUser}/state`));    stateListener   = null; }
+        if (cmdListener)     { off(ref(db, `users/${currentUser}/commands`));  cmdListener     = null; }
+        if (devicesListener) { off(ref(db, `users/${currentUser}/devices`));   devicesListener = null; }
+      }
     }
 
     // ── Devices list UI ───────────────────────────────────────────────────────
@@ -6260,29 +6293,35 @@
     }
 
     // ── Hook into existing CRT controls ──────────────────────────────────────
-    // We patch in after a short delay to ensure DOM+app are ready
     setTimeout(() => {
-      // expose current track to our scope via a global the main script sets
-      // (we read window.__currentStreamTrack, which main script populates)
+      const isOwner = () => lastAudioOwner === deviceId || lastAudioOwner === null;
 
-      // Play/pause broadcast
-      audioEl?.addEventListener("play",  () => { if(!applyingRemote) sendCommand("PLAY");  broadcastState(); });
-      audioEl?.addEventListener("pause", () => { if(!applyingRemote) sendCommand("PAUSE"); broadcastState(); });
+      // Owner: broadcast state. Non-owner: send command.
+      audioEl?.addEventListener("play", () => {
+        if (applyingRemote) return;
+        if (isOwner()) broadcastState();
+        else sendCommand("PLAY");
+      });
+      audioEl?.addEventListener("pause", () => {
+        if (applyingRemote) return;
+        if (isOwner()) broadcastState();
+        else sendCommand("PAUSE");
+      });
 
-      // Seek broadcast (on change, not input, to avoid spam)
       seekBar?.addEventListener("change", () => {
-        if (!applyingRemote && audioEl) sendCommand("SEEK", audioEl.currentTime);
-        broadcastState();
+        if (applyingRemote || !audioEl) return;
+        if (isOwner()) broadcastState();
+        else sendCommand("SEEK", audioEl.currentTime);
       });
 
-      // Volume broadcast
       volumeSlider?.addEventListener("change", () => {
-        if (!applyingRemote) sendCommand("VOLUME", audioEl.volume);
-        broadcastState();
+        if (applyingRemote || !audioEl) return;
+        if (isOwner()) broadcastState();
+        else sendCommand("VOLUME", audioEl.volume);
       });
 
-      // Periodic position broadcast (every 5s) for seek sync
-      setInterval(broadcastState, 5000);
+      // Periodic position broadcast for owner only
+      setInterval(() => { if (isOwner()) broadcastState(); }, 5000);
     }, 1500);
 
     // ── Expose broadcast so playTrack can call it ─────────────────────────────
