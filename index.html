@@ -1718,7 +1718,7 @@
             ═══════════════════════════════════════════════════════════ -->
             <details class="group collapsible" id="sectionConnect" data-section="connect">
               <summary class="groupSummary">Connect</summary>
-              <div class="groupContent" id="connectContent" style="min-width:min(100%,480px);">
+              <div class="groupContent" id="connectContent" style="width:100%;">
 
                 <!-- NOT LOGGED IN -->
                 <div id="connectLogin">
@@ -5877,6 +5877,9 @@
       composer.render();
     }
     animate();
+
+    // Expose playTrack for CRT Connect audio transfer
+    window.__crtPlayTrack = (track, opts) => playTrack(track, null, null, opts || { freshPick: false });
   </script>
 
   <!-- CRT Connect: optional Firebase-based multi-device sync -->
@@ -6059,11 +6062,19 @@
     }
 
     // ── Apply remote state coming FROM Firebase ───────────────────────────────
+    // Track the last audioOwner we saw so we can detect ownership transitions
+    let lastAudioOwner = null;
+    let lastLoadedTrackId = null;
+
     async function applyRemoteState(state) {
       if (!state || state.updatedBy === deviceId) return; // ignore our own writes
-      if (state.audioOwner !== deviceId) {
-        // We are a controller/mirror — sync UI but don't play audio here
-        // Update pill display if track changed
+
+      const weOwnAudio = state.audioOwner === deviceId;
+      const ownershipJustTransferredToUs = weOwnAudio && lastAudioOwner !== deviceId;
+      lastAudioOwner = state.audioOwner;
+
+      if (!weOwnAudio) {
+        // Mirror mode — update pill UI only
         if (state.title) {
           const pillTitle  = document.getElementById("pillTitle");
           const pillArtist = document.getElementById("pillArtist");
@@ -6072,24 +6083,46 @@
           if (pillArtist && state.artist !== pillArtist.textContent) pillArtist.textContent = state.artist || "";
           if (pillThumb  && state.picUrl) { pillThumb.src = state.picUrl; pillThumb.style.display=""; }
         }
-        // Keep seek bar in sync
-        if (seekBar && Number.isFinite(audioEl?.duration) && audioEl.duration > 0) {
-          const pct = (state.position / audioEl.duration) * 100;
-          seekBar.value = pct;
-        }
         return;
       }
-      // We ARE the audio owner — apply everything
+
+      // We ARE the audio owner
       applyingRemote = true;
       try {
         if (state.volume !== undefined) audioEl.volume = state.volume;
-        if (state.playing && audioEl.paused)  { audioEl.play().catch(()=>{}); }
-        if (!state.playing && !audioEl.paused) { audioEl.pause(); }
-        if (state.position !== undefined && Math.abs(audioEl.currentTime - state.position) > 3) {
-          audioEl.currentTime = state.position;
+
+        if (ownershipJustTransferredToUs && state.trackId) {
+          // Full track load — ownership just moved to us
+          const track = {
+            id:     state.trackId,
+            name:   state.title  || "",
+            artist: state.artist || "",
+            pic:    state.picUrl || null,
+            album:  "",
+          };
+          lastLoadedTrackId = state.trackId;
+          const seekToPosition = state.position || 0;
+          // playTrack is exposed on window by the main script
+          if (window.__crtPlayTrack) {
+            await window.__crtPlayTrack(track, { freshPick: false });
+            // Seek to correct position after load
+            audioEl.addEventListener("loadedmetadata", function onMeta() {
+              audioEl.removeEventListener("loadedmetadata", onMeta);
+              audioEl.currentTime = seekToPosition;
+              if (state.playing) audioEl.play().catch(()=>{});
+              else audioEl.pause();
+            }, { once: true });
+          }
+        } else {
+          // Already owner, just sync play state + position drift
+          if (state.playing && audioEl.paused)   audioEl.play().catch(()=>{});
+          if (!state.playing && !audioEl.paused)  audioEl.pause();
+          if (state.position !== undefined && Math.abs(audioEl.currentTime - state.position) > 4) {
+            audioEl.currentTime = state.position;
+          }
         }
       } finally {
-        setTimeout(() => { applyingRemote = false; }, 500);
+        setTimeout(() => { applyingRemote = false; }, 1000);
       }
     }
 
@@ -6152,26 +6185,43 @@
     // ── Devices list UI ───────────────────────────────────────────────────────
     function renderDevices(devicesObj) {
       deviceList.innerHTML = "";
-      const others = Object.entries(devicesObj).filter(([id]) => id !== deviceId);
-      if (others.length === 0) {
+      const all = Object.entries(devicesObj);
+      if (all.length <= 1 && !devicesObj[deviceId]) {
         noDevicesMsg.style.display = "";
         return;
       }
       noDevicesMsg.style.display = "none";
-      others.forEach(([id, dev]) => {
-        const isOnline = dev.isOnline && (Date.now() - dev.lastSeen < 90_000);
+
+      // Sort: this device first, then others
+      const sorted = [
+        ...all.filter(([id]) => id === deviceId),
+        ...all.filter(([id]) => id !== deviceId),
+      ];
+
+      sorted.forEach(([id, dev]) => {
+        const isOnline   = dev.isOnline && (Date.now() - dev.lastSeen < 90_000);
+        const isThisDevice = id === deviceId;
+        const isOwner    = lastAudioOwner === id;
+        const label      = isThisDevice ? `${dev.name || "This device"} (you)` : (dev.name || "Unknown");
+        const showPlay   = isOnline && !isOwner; // "Play here" on any online non-owner
+
         const row = document.createElement("div");
-        row.style.cssText = "display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,.04);border-radius:6px;";
+        row.style.cssText = `display:flex;align-items:center;gap:8px;padding:6px 8px;background:${isOwner?"rgba(76,175,80,.1)":"rgba(255,255,255,.04)"};border-radius:6px;border:1px solid ${isOwner?"rgba(76,175,80,.25)":"transparent"};`;
         row.innerHTML = `
           <span style="width:6px;height:6px;border-radius:50%;background:${isOnline?"#4caf50":"#555"};flex-shrink:0;"></span>
-          <span style="flex:1;font-size:12px;font-family:ui-monospace,monospace;color:${isOnline?"var(--text)":"var(--muted)"};">${dev.name || "Unknown"}</span>
-          ${isOnline ? `<button class="secondary" data-device-id="${id}" style="font-size:10px;padding:2px 8px;">Play here</button>` : ""}
+          <span style="flex:1;font-size:12px;font-family:ui-monospace,monospace;color:${isOnline?"var(--text)":"var(--muted)"};">${label}</span>
+          ${isOwner ? `<span style="font-size:10px;color:#4caf50;font-family:ui-monospace,monospace;">▶ playing</span>` : ""}
+          ${showPlay ? `<button class="secondary" data-device-id="${id}" style="font-size:10px;padding:2px 8px;">Play here</button>` : ""}
         `;
-        if (isOnline) {
+        if (showPlay) {
           row.querySelector("button").addEventListener("click", () => transferAudioTo(id));
         }
         deviceList.appendChild(row);
       });
+
+      // Show empty message only if no other devices exist at all
+      const hasOthers = all.some(([id]) => id !== deviceId);
+      noDevicesMsg.style.display = hasOthers ? "none" : "";
     }
 
     async function transferAudioTo(targetDeviceId) {
