@@ -2596,8 +2596,44 @@
     // prevBtn/nextBtn = wing buttons; card mirrors delegate to them
     const prevBtn          = document.getElementById("prevBtn");
     const nextBtn          = document.getElementById("nextBtn");
-    if (prevBtnCard) prevBtnCard.addEventListener("click", () => prevBtn?.click());
-    if (nextBtnCard) nextBtnCard.addEventListener("click", () => nextBtn?.click());
+    
+    // Card buttons with Connect support
+    if (prevBtnCard) {
+      prevBtnCard.addEventListener("click", (e) => {
+        // CRT Connect: check ownership first
+        const deviceId = localStorage.getItem("crt_connect_device_id");
+        const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
+        const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
+        const isConnected = window.__crtConnect && lastAudioOwner !== null;
+
+        if (isConnected && !isOwner) {
+          if (window.__crtConnect && window.__crtConnect.sendCommand) {
+            window.__crtConnect.sendCommand("PREV");
+          }
+          return;
+        }
+        prevBtn?.click();
+      });
+    }
+    
+    if (nextBtnCard) {
+      nextBtnCard.addEventListener("click", (e) => {
+        // CRT Connect: check ownership first
+        const deviceId = localStorage.getItem("crt_connect_device_id");
+        const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
+        const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
+        const isConnected = window.__crtConnect && lastAudioOwner !== null;
+
+        if (isConnected && !isOwner) {
+          if (window.__crtConnect && window.__crtConnect.sendCommand) {
+            window.__crtConnect.sendCommand("NEXT");
+          }
+          return;
+        }
+        nextBtn?.click();
+      });
+    }
+    
     if (playPauseBtnCard) playPauseBtnCard.addEventListener("click", () => playPauseBtn?.click());
     const seekBar          = document.getElementById("seekBar");
     const seekTime         = document.getElementById("seekTime");
@@ -6272,12 +6308,26 @@
           if (pillSeekScrub) pillSeekScrub.value = pct;
         }
 
-        // Update play/pause icon
+        // Update pill now-playing info
+        const pillTitle = document.getElementById('pillTitle');
+        const pillArtist = document.getElementById('pillArtist');
+        const pillThumb = document.getElementById('pillThumb');
+        if (pillTitle && state.title && state.title !== pillTitle.textContent) pillTitle.textContent = state.title;
+        if (pillArtist && state.artist !== undefined && state.artist !== pillArtist.textContent) pillArtist.textContent = state.artist || '';
+        if (pillThumb && state.picUrl) { pillThumb.src = state.picUrl; pillThumb.style.display = ''; }
+
+        // Update play/pause icon (both wing and card)
         const playIcon = document.getElementById('playIcon');
         const pauseIcon = document.getElementById('pauseIcon');
         if (playIcon && pauseIcon) {
           playIcon.style.display = state.playing ? "none" : "";
           pauseIcon.style.display = state.playing ? "" : "none";
+        }
+        const playIconCard = document.getElementById('playIconCard');
+        const pauseIconCard = document.getElementById('pauseIconCard');
+        if (playIconCard && pauseIconCard) {
+          playIconCard.style.display = state.playing ? "none" : "";
+          pauseIconCard.style.display = state.playing ? "" : "none";
         }
 
         // Update volume slider
@@ -6317,6 +6367,7 @@
               function seekWhenReady() {
                 if (audioEl && Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
                   audioEl.currentTime = seekPos;
+                  console.log('[CRT Connect] Seek complete, play state:', shouldPlay);
                   if (shouldPlay) {
                     audioEl.play().catch(() => console.warn('[CRT Connect] Autoplay blocked'));
                   } else {
@@ -6325,6 +6376,7 @@
                 } else {
                   audioEl.addEventListener('loadedmetadata', () => {
                     audioEl.currentTime = seekPos;
+                    console.log('[CRT Connect] Seek complete (loadedmetadata), play state:', shouldPlay);
                     if (shouldPlay) {
                       audioEl.play().catch(() => console.warn('[CRT Connect] Autoplay blocked'));
                     } else {
@@ -6334,7 +6386,11 @@
                 }
               }
               seekWhenReady();
-            }).catch(err => console.warn('[CRT Connect] Transfer playTrack failed:', err));
+            }).catch(err => {
+              console.warn('[CRT Connect] Transfer playTrack failed:', err);
+              // Even if playTrack fails, still try to update UI
+              console.log('[CRT Connect] PlayTrack failed, updating UI anyway');
+            });
           } else {
             console.warn('[CRT Connect] __crtPlayTrack not available');
           }
@@ -6603,6 +6659,25 @@
 
       // Periodic position broadcast for owner only
       setInterval(() => { if (isOwner()) broadcastState(); }, 5000);
+
+      // Periodic pill seek update for non-owners (live sync)
+      setInterval(() => {
+        if (!isOwner() && currentUser) {
+          const stateSnap = get(ref(db, `users/${currentUser}/state`));
+          stateSnap.then(snap => {
+            if (snap.exists()) {
+              const state = snap.val();
+              const pillSeekFill = document.getElementById('pillSeekFill');
+              const pillSeekScrub = document.getElementById('pillSeekScrub');
+              if (pillSeekFill && state.position !== undefined && Number.isFinite(state.duration) && state.duration > 0) {
+                const pct = (state.position / state.duration) * 100;
+                pillSeekFill.style.width = pct + "%";
+                if (pillSeekScrub) pillSeekScrub.value = pct;
+              }
+            }
+          });
+        }
+      }, 1000);
     }, 1500);
 
     // ── Expose functions for main app integration ─────────────────────────────
