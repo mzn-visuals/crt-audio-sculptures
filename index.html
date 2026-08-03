@@ -2142,11 +2142,26 @@
         ensureAudio();
         if (audioCtx.state === "suspended") await audioCtx.resume();
 
+        // CRT Connect: check ownership
+        const deviceId = localStorage.getItem("crt_connect_device_id");
+        const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
+        const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
+
         if (audioEl.paused) {
+          if (!isOwner && window.__crtConnect && window.__crtConnect.sendCommand) {
+            // Send PLAY command to owner
+            window.__crtConnect.sendCommand("PLAY");
+            return;
+          }
           await audioEl.play();
           setPlayPauseIcon(true);
           setStatus(isLocalFileMode ? "playing file" : "streaming", true);
         } else {
+          if (!isOwner && window.__crtConnect && window.__crtConnect.sendCommand) {
+            // Send PAUSE command to owner
+            window.__crtConnect.sendCommand("PAUSE");
+            return;
+          }
           audioEl.pause();
           setPlayPauseIcon(false);
           setStatus(isLocalFileMode ? "paused" : "paused", false);
@@ -2207,6 +2222,14 @@
       if (isMuted && +volumeSlider.value > 0) isMuted = false;
       applyVolume();
       flashVolPercent(Math.round(+volumeSlider.value));
+      // CRT Connect: send volume command if not owner
+      if (window.__crtConnect && window.__crtConnect.sendCommand) {
+        const deviceId = localStorage.getItem("crt_connect_device_id");
+        const lastAudioOwner = window.__crtConnect.getAudioOwner();
+        if (lastAudioOwner && deviceId && lastAudioOwner !== deviceId) {
+          window.__crtConnect.sendCommand("VOLUME", audioEl.volume);
+        }
+      }
     });
 
     volumeControl.addEventListener("wheel", (e) => {
@@ -3086,6 +3109,14 @@
     seekBar.addEventListener("change", () => {
       if (Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
         audioEl.currentTime = (seekBar.value / 100) * audioEl.duration;
+        // CRT Connect: send seek command if not owner
+        if (window.__crtConnect && window.__crtConnect.sendCommand) {
+          const deviceId = localStorage.getItem("crt_connect_device_id");
+          const lastAudioOwner = window.__crtConnect.getAudioOwner();
+          if (lastAudioOwner && deviceId && lastAudioOwner !== deviceId) {
+            window.__crtConnect.sendCommand("SEEK", audioEl.currentTime);
+          }
+        }
       }
       seekDragging = false;
     });
@@ -5931,6 +5962,7 @@
     let cmdListener    = null;
     let devicesListener= null;
     let applyingRemote = false;  // guard: don't re-broadcast changes we received
+    let autoPaused = false;      // guard: pause was automatic, don't send command
     let lastBroadcastedState = null;
 
     // ── DOM refs ─────────────────────────────────────────────────────────────
@@ -6091,6 +6123,10 @@
 
       const prevOwner  = lastAudioOwner;
       lastAudioOwner   = state.audioOwner;
+      // Update the exposed owner for main app integration
+      if (window.__crtConnect && window.__crtConnect.setAudioOwner) {
+        window.__crtConnect.setAudioOwner(lastAudioOwner);
+      }
       const weOwnAudio = state.audioOwner === deviceId;
       const justGotOwnership = weOwnAudio && prevOwner !== deviceId;
       console.log('[CRT Connect] Ownership check:', { weOwnAudio, justGotOwnership, prevOwner, newOwner: state.audioOwner });
@@ -6100,6 +6136,7 @@
         // If we just lost ownership, pause audio locally
         if (prevOwner === deviceId && audioEl && !audioEl.paused) {
           console.log('[CRT Connect] Lost ownership, pausing local audio');
+          autoPaused = true;
           audioEl.pause();
         }
 
@@ -6157,10 +6194,10 @@
 
         if (justGotOwnership && state.trackId) {
           // Transfer received — load and play the track
-          console.log('[CRT Connect] Audio transfer received, loading track:', state.trackId);
+          console.log('[CRT Connect] Audio transfer received, loading track:', state.trackId, 'should play:', state.playing);
           pendingTransferTrackId = state.trackId;
           const seekPos = state.position || 0;
-          const shouldPlay = state.playing !== false;
+          const shouldPlay = state.playing === true;
 
           if (window.__crtPlayTrack) {
             const track = {
@@ -6176,11 +6213,19 @@
               function seekWhenReady() {
                 if (audioEl && Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
                   audioEl.currentTime = seekPos;
-                  if (!shouldPlay) audioEl.pause();
+                  if (shouldPlay) {
+                    audioEl.play().catch(() => console.warn('[CRT Connect] Autoplay blocked'));
+                  } else {
+                    audioEl.pause();
+                  }
                 } else {
                   audioEl.addEventListener('loadedmetadata', () => {
                     audioEl.currentTime = seekPos;
-                    if (!shouldPlay) audioEl.pause();
+                    if (shouldPlay) {
+                      audioEl.play().catch(() => console.warn('[CRT Connect] Autoplay blocked'));
+                    } else {
+                      audioEl.pause();
+                    }
                   }, { once: true });
                 }
               }
@@ -6421,7 +6466,12 @@
       });
       audioEl?.addEventListener("pause", () => {
         if (applyingRemote) return;
-        console.log('[CRT Connect] Audio pause event, current owner:', lastAudioOwner, 'my device:', deviceId);
+        console.log('[CRT Connect] Audio pause event, current owner:', lastAudioOwner, 'my device:', deviceId, 'autoPaused:', autoPaused);
+        // Don't send command if this was an automatic pause from ownership loss
+        if (autoPaused) {
+          autoPaused = false;
+          return;
+        }
         if (isOwner()) {
           broadcastState();
         } else {
@@ -6430,24 +6480,21 @@
         }
       });
 
-      seekBar?.addEventListener("change", () => {
-        if (applyingRemote || !audioEl) return;
-        if (isOwner()) broadcastState();
-        else sendCommand("SEEK", audioEl.currentTime);
-      });
-
-      volumeSlider?.addEventListener("change", () => {
-        if (applyingRemote || !audioEl) return;
-        if (isOwner()) broadcastState();
-        else sendCommand("VOLUME", audioEl.volume);
-      });
+      // Don't add duplicate listeners - integrate with existing ones
+      // The main app already handles seekBar and volumeSlider changes
+      // We'll hook into those instead
 
       // Periodic position broadcast for owner only
       setInterval(() => { if (isOwner()) broadcastState(); }, 5000);
     }, 1500);
 
-    // ── Expose broadcast so playTrack can call it ─────────────────────────────
-    window.__crtConnect = { broadcastState, sendCommand };
+    // ── Expose functions for main app integration ─────────────────────────────
+    window.__crtConnect = {
+      broadcastState,
+      sendCommand,
+      getAudioOwner: () => lastAudioOwner,
+      setAudioOwner: (owner) => { lastAudioOwner = owner; }
+    };
 
     // ── UI event listeners ────────────────────────────────────────────────────
     signInBtn.addEventListener("click", () => signIn(userInput.value.trim(), passInput.value));
