@@ -1981,6 +1981,21 @@
 
     muteBtn.addEventListener("click", (e) => {
       e.stopPropagation();
+      // CRT Connect: check ownership first
+      const deviceId = localStorage.getItem("crt_connect_device_id");
+      const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
+      const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
+      const isConnected = window.__crtConnect && lastAudioOwner !== null;
+
+      if (isConnected && !isOwner) {
+        // Send mute command to owner
+        if (window.__crtConnect && window.__crtConnect.sendCommand) {
+          window.__crtConnect.sendCommand("MUTE");
+        }
+        return;
+      }
+
+      // Normal mute when owner or not connected
       wingMuted = !wingMuted;
       if (wingMuted) { volScrub.value = 0; setWingVol(0); }
       else           { volScrub.value = wingLastVol; setWingVol(wingLastVol); }
@@ -3039,6 +3054,20 @@
     }
 
     prevBtn.addEventListener("click", async () => {
+      // CRT Connect: check ownership first
+      const deviceId = localStorage.getItem("crt_connect_device_id");
+      const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
+      const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
+      const isConnected = window.__crtConnect && lastAudioOwner !== null;
+
+      if (isConnected && !isOwner) {
+        if (window.__crtConnect && window.__crtConnect.sendCommand) {
+          window.__crtConnect.sendCommand("PREV");
+        }
+        return;
+      }
+
+      // Normal prev when owner or not connected
       if (!playHistory.length) return;
       const prevTrack = playHistory.pop();
       // Put the track we're leaving back at the front of the queue so
@@ -3065,6 +3094,20 @@
     });
 
     nextBtn.addEventListener("click", async () => {
+      // CRT Connect: check ownership first
+      const deviceId = localStorage.getItem("crt_connect_device_id");
+      const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
+      const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
+      const isConnected = window.__crtConnect && lastAudioOwner !== null;
+
+      if (isConnected && !isOwner) {
+        if (window.__crtConnect && window.__crtConnect.sendCommand) {
+          window.__crtConnect.sendCommand("NEXT");
+        }
+        return;
+      }
+
+      // Normal next when owner or not connected
       if (isLocalFileMode) return;
       await advanceQueue();
       updatePrevNextButtons();
@@ -3105,6 +3148,23 @@
       updatePillSeek(+pillSeekScrub.value);
     });
     pillSeekScrub.addEventListener("change", () => {
+      // CRT Connect: check ownership first
+      const deviceId = localStorage.getItem("crt_connect_device_id");
+      const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
+      const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
+      const isConnected = window.__crtConnect && lastAudioOwner !== null;
+
+      if (isConnected && !isOwner) {
+        // Send seek command to owner
+        if (window.__crtConnect && window.__crtConnect.sendCommand) {
+          const seekPercent = +pillSeekScrub.value / 100;
+          window.__crtConnect.sendCommand("SEEK_PERCENT", seekPercent);
+        }
+        pillSeekDragging = false;
+        return;
+      }
+
+      // Normal seek when owner or not connected
       if (Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
         audioEl.currentTime = (+pillSeekScrub.value / 100) * audioEl.duration;
       }
@@ -6203,6 +6263,15 @@
           if (seekDuration) seekDuration.textContent = fmtTime(state.duration);
         }
 
+        // Update pill seek fill
+        const pillSeekFill = document.getElementById('pillSeekFill');
+        const pillSeekScrub = document.getElementById('pillSeekScrub');
+        if (pillSeekFill && state.position !== undefined && Number.isFinite(state.duration) && state.duration > 0) {
+          const pct = (state.position / state.duration) * 100;
+          pillSeekFill.style.width = pct + "%";
+          if (pillSeekScrub) pillSeekScrub.value = pct;
+        }
+
         // Update play/pause icon
         const playIcon = document.getElementById('playIcon');
         const pauseIcon = document.getElementById('pauseIcon');
@@ -6241,7 +6310,9 @@
               album:  '',
             };
             // playTrack resolves the stream and plays — then we seek
+            console.log('[CRT Connect] Calling __crtPlayTrack with track:', track);
             window.__crtPlayTrack(track, { freshPick: false }).then(() => {
+              console.log('[CRT Connect] Track loaded, seeking to:', seekPos, 'should play:', shouldPlay);
               // Wait for audio to have duration before seeking
               function seekWhenReady() {
                 if (audioEl && Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
@@ -6264,6 +6335,8 @@
               }
               seekWhenReady();
             }).catch(err => console.warn('[CRT Connect] Transfer playTrack failed:', err));
+          } else {
+            console.warn('[CRT Connect] __crtPlayTrack not available');
           }
         } else if (!justGotOwnership) {
           // Already owner — keep in sync with remote commands
@@ -6338,6 +6411,11 @@
             const vs = document.getElementById('volumeSlider');
             if (vs) vs.value = Math.round(cmd.value * 100);
           }
+          break;
+        case 'MUTE':
+          console.log('[CRT Connect] Executing MUTE command');
+          const muteBtn = document.getElementById('muteBtn');
+          if (muteBtn) muteBtn.click();
           break;
         case 'NEXT':
           console.log('[CRT Connect] Executing NEXT command');
