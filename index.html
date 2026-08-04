@@ -6722,6 +6722,15 @@
                 pillSeekFill.style.width = pct + "%";
                 if (pillSeekScrub) pillSeekScrub.value = pct;
               }
+              // Also update seek time display
+              const seekTime = document.getElementById('seekTime');
+              const seekDuration = document.getElementById('seekDuration');
+              if (state.position !== undefined && seekTime) {
+                seekTime.textContent = fmtTime(state.position);
+              }
+              if (state.duration !== undefined && Number.isFinite(state.duration) && seekDuration) {
+                seekDuration.textContent = fmtTime(state.duration);
+              }
             }
           });
         }
