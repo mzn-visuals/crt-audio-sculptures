@@ -6726,10 +6726,13 @@
               const seekTime = document.getElementById('seekTime');
               const seekDuration = document.getElementById('seekDuration');
               if (state.position !== undefined && seekTime) {
-                seekTime.textContent = fmtTime(state.position);
+                // Local fmtTime function
+                const m = Math.floor(state.position/60), s = Math.floor(state.position%60);
+                seekTime.textContent = `${m}:${s.toString().padStart(2,"0")}`;
               }
               if (state.duration !== undefined && Number.isFinite(state.duration) && seekDuration) {
-                seekDuration.textContent = fmtTime(state.duration);
+                const m = Math.floor(state.duration/60), s = Math.floor(state.duration%60);
+                seekDuration.textContent = `${m}:${s.toString().padStart(2,"0")}`;
               }
             }
           });
