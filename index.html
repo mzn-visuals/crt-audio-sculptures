@@ -6331,10 +6331,13 @@
         seekBar.value = pct;
         if (seekTime) seekTime.textContent = fmtTime(state.position);
         if (seekDuration) seekDuration.textContent = fmtTime(state.duration);
-      } else if (seekBar && state.position !== undefined && Number.isFinite(state.duration)) {
-        // Even if duration is 0, still update position/time
-        if (seekTime) seekTime.textContent = fmtTime(state.position);
-        if (seekDuration) seekDuration.textContent = fmtTime(state.duration);
+      }
+      // Always update time display even if duration is invalid
+      if (state.position !== undefined && seekTime) {
+        seekTime.textContent = fmtTime(state.position);
+      }
+      if (state.duration !== undefined && Number.isFinite(state.duration) && seekDuration) {
+        seekDuration.textContent = fmtTime(state.duration);
       }
 
       // Update pill seek fill
