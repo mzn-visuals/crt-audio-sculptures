@@ -2791,6 +2791,12 @@
         item.append(playBtn, title, artist, remove);
         queuePanel.appendChild(item);
       });
+
+      // Sync queue to other devices when we're the host
+      if (window.__crtConnect?.broadcastState) {
+        clearTimeout(window.__crtQueueBroadcastTimer);
+        window.__crtQueueBroadcastTimer = setTimeout(() => window.__crtConnect.broadcastState(), 300);
+      }
     }
 
     // Jump straight to a specific queue item — everything before it is
@@ -3062,6 +3068,23 @@
 
     // Backwards-compatible name used by search-result click handlers.
     async function playStreamTrack(track, el, statusEl){
+      // If connected and not the audio owner, redirect the play request to the host
+      const crt = window.__crtConnect;
+      if (crt && crt.getAudioOwner && crt.getAudioOwner() && crt.getAudioOwner() !== crt.getDeviceId?.()) {
+        console.log('[CRT Connect] Client search: sending LOAD command to host for track:', track.id);
+        crt.sendCommand('LOAD', {
+          id:     track.id,
+          name:   track.name   || track.title  || '',
+          title:  track.title  || track.name   || '',
+          artist: track.artist || '',
+          pic:    track.pic    || track.picUrl  || null,
+          picUrl: track.picUrl || track.pic     || null,
+          album:  track.album  || '',
+        });
+        // Show brief visual feedback on the client row
+        if (el) { el.style.opacity = '0.5'; setTimeout(() => { el.style.opacity = ''; }, 1200); }
+        return;
+      }
       return playTrack(track, el, statusEl);
     }
 
@@ -6074,6 +6097,15 @@
 
     // Expose playTrack for CRT Connect audio transfer
     window.__crtPlayTrack = (track, opts) => playTrack(track, null, null, opts || { freshPick: false });
+
+    // Expose queue accessors/setters for CRT Connect sync
+    window.__crtQueue        = () => queue;
+    window.__crtQueueIsRadio = () => queueIsRadio;
+    window.__crtSetQueue     = (newQueue, isRadio) => {
+      queue = Array.isArray(newQueue) ? newQueue : [];
+      queueIsRadio = !!isRadio;
+      renderQueuePanel();
+    };
   </script>
 
   <!-- CRT Connect: optional Firebase-based multi-device sync -->
@@ -6262,7 +6294,9 @@
         volume:     audioEl.volume,
         audioOwner: deviceId,
         updatedBy:  deviceId,
-        updatedAt:  Date.now()
+        updatedAt:  Date.now(),
+        queue:      JSON.stringify(window.__crtQueue ? window.__crtQueue() : []),
+        queueIsRadio: !!(window.__crtQueueIsRadio && window.__crtQueueIsRadio())
       };
       const sig = `${state.trackId}|${Math.round(state.position)}|${state.playing}|${state.volume}`;
       if (sig === lastBroadcastSig) return;
@@ -6299,6 +6333,14 @@
           console.log('[CRT Connect] Lost ownership, pausing local audio');
           autoPaused = true;
           audioEl.pause();
+        }
+
+        // Sync queue from host
+        if (state.queue !== undefined && window.__crtSetQueue) {
+          try {
+            const remoteQueue = JSON.parse(state.queue);
+            window.__crtSetQueue(remoteQueue, !!state.queueIsRadio);
+          } catch (_) {}
         }
       }
 
@@ -6472,8 +6514,9 @@
         console.log('[CRT Connect] No owner exists, claiming ownership');
         lastAudioOwner = deviceId;
       }
-      // PLAY command from another device: transfer ownership to that device
-      if (cmd.type === 'PLAY' && lastAudioOwner === deviceId && cmd.from !== deviceId) {
+      // PLAY command from another device: only transfer ownership when a specific targetDevice is set.
+      // A plain PLAY (no targetDevice) is just a remote play/pause toggle — execute it locally.
+      if (cmd.type === 'PLAY' && lastAudioOwner === deviceId && cmd.from !== deviceId && cmd.targetDevice) {
         console.log('[CRT Connect] PLAY command from another device, transferring ownership to:', cmd.from);
         // Transfer ownership to the requesting device (or specified target)
         const targetDevice = cmd.targetDevice || cmd.from;
@@ -6558,6 +6601,12 @@
             // Update UI
             const vs = document.getElementById('volumeSlider');
             if (vs) vs.value = Math.round(audioEl.volume * 100);
+          }
+          break;
+        case 'LOAD':
+          console.log('[CRT Connect] Executing LOAD command, track:', cmd.value);
+          if (cmd.value && window.__crtPlayTrack) {
+            window.__crtPlayTrack(cmd.value, { freshPick: true });
           }
           break;
         case 'NEXT':
@@ -6795,6 +6844,7 @@
       sendCommand,
       getAudioOwner: () => lastAudioOwner,
       setAudioOwner: (owner) => { lastAudioOwner = owner; },
+      getDeviceId:   () => deviceId,
       getDb: () => db
     };
 
