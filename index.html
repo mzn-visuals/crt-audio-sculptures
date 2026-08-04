@@ -2650,7 +2650,40 @@
       });
     }
     
-    if (playPauseBtnCard) playPauseBtnCard.addEventListener("click", () => playPauseBtn?.click());
+    if (playPauseBtnCard) {
+      playPauseBtnCard.addEventListener("click", async () => {
+        try {
+          // CRT Connect: check ownership first
+          const deviceId = localStorage.getItem("crt_connect_device_id");
+          const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
+          const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
+          const isConnected = window.__crtConnect && lastAudioOwner !== null;
+
+          // If connected and not owner, send command based on current UI state
+          if (isConnected && !isOwner) {
+            const playIcon = document.getElementById('playIcon');
+            const pauseIcon = document.getElementById('pauseIcon');
+            const isPaused = playIcon && playIcon.style.display !== "none";
+            // Toggle the icon locally immediately for better UX
+            if (isPaused) {
+              playIcon.style.display = "none";
+              pauseIcon.style.display = "";
+              window.__crtConnect.sendCommand("PLAY");
+            } else {
+              playIcon.style.display = "";
+              pauseIcon.style.display = "none";
+              window.__crtConnect.sendCommand("PAUSE");
+            }
+            return;
+          }
+
+          // Normal behavior when owner or not connected
+          playPauseBtn?.click();
+        } catch (e) {
+          console.error(e);
+        }
+      });
+    }
     const seekBar          = document.getElementById("seekBar");
     const seekTime         = document.getElementById("seekTime");
     const seekDuration     = document.getElementById("seekDuration");
@@ -6313,10 +6346,12 @@
         seekBar.value = pct;
         if (seekTime) seekTime.textContent = fmtTime(state.position);
         if (seekDuration) seekDuration.textContent = fmtTime(state.duration);
-      } else if (seekBar && state.position !== undefined && Number.isFinite(state.duration)) {
-        // Even if duration is 0, still update position/time
+      } else if (state.position !== undefined) {
+        // Always update time even if duration is invalid
         if (seekTime) seekTime.textContent = fmtTime(state.position);
-        if (seekDuration) seekDuration.textContent = fmtTime(state.duration);
+        if (seekDuration && state.duration !== undefined && Number.isFinite(state.duration)) {
+          seekDuration.textContent = fmtTime(state.duration);
+        }
       }
 
       // Update pill seek fill
