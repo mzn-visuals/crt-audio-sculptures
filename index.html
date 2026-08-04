@@ -6329,15 +6329,17 @@
       if (seekBar && state.position !== undefined && Number.isFinite(state.duration) && state.duration > 0) {
         const pct = (state.position / state.duration) * 100;
         seekBar.value = pct;
-        if (seekTime) seekTime.textContent = fmtTime(state.position);
-        if (seekDuration) seekDuration.textContent = fmtTime(state.duration);
+        const _fmt2 = (sec) => { if (!Number.isFinite(sec) || sec < 0) return "0:00"; const m = Math.floor(sec/60), s = Math.floor(sec%60); return `${m}:${s.toString().padStart(2,"0")}`; };
+        if (seekTime) seekTime.textContent = _fmt2(state.position);
+        if (seekDuration) seekDuration.textContent = _fmt2(state.duration);
       }
       // Always update time display even if duration is invalid
+      const _fmt = (sec) => { if (!Number.isFinite(sec) || sec < 0) return "0:00"; const m = Math.floor(sec/60), s = Math.floor(sec%60); return `${m}:${s.toString().padStart(2,"0")}`; };
       if (state.position !== undefined && seekTime) {
-        seekTime.textContent = fmtTime(state.position);
+        seekTime.textContent = _fmt(state.position);
       }
       if (state.duration !== undefined && Number.isFinite(state.duration) && seekDuration) {
-        seekDuration.textContent = fmtTime(state.duration);
+        seekDuration.textContent = _fmt(state.duration);
       }
 
       // Update pill seek fill
