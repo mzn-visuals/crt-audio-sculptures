@@ -2805,6 +2805,24 @@
     async function playFromQueue(index){
       const track = queue[index];
       if (!track) return;
+
+      // If connected and not the audio owner, redirect to host via LOAD command
+      const crt = window.__crtConnect;
+      if (crt && crt.getAudioOwner && crt.getAudioOwner() && crt.getAudioOwner() !== crt.getDeviceId?.()) {
+        console.log('[CRT Connect] Client queue play: sending LOAD command to host for track:', track.id);
+        crt.sendCommand('LOAD', {
+          id:       track.id,
+          name:     track.name   || track.title  || '',
+          title:    track.title  || track.name   || '',
+          artist:   track.artist || '',
+          pic:      track.pic    || track.picUrl  || null,
+          picUrl:   track.picUrl || track.pic     || null,
+          album:    track.album  || '',
+          freshPick: false,
+        });
+        return;
+      }
+
       queue.splice(0, index + 1);
       renderQueuePanel();
       const resultEl = searchResults.querySelector(`.sResult[data-id="${track.id}"]`);
@@ -6606,7 +6624,8 @@
         case 'LOAD':
           console.log('[CRT Connect] Executing LOAD command, track:', cmd.value);
           if (cmd.value && window.__crtPlayTrack) {
-            window.__crtPlayTrack(cmd.value, { freshPick: true });
+            const { freshPick: fp, ...trackData } = cmd.value;
+            window.__crtPlayTrack(trackData, { freshPick: fp !== false });
           }
           break;
         case 'NEXT':
