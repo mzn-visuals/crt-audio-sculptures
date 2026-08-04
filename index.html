@@ -2821,6 +2821,12 @@
       return `${m}:${s.toString().padStart(2,"0")}`;
     }
 
+    function fmtTime(sec){
+      if (!sec || sec <= 0) return "0:00";
+      const m = Math.floor(sec/60), s = Math.floor(sec%60);
+      return `${m}:${s.toString().padStart(2,"0")}`;
+    }
+
     // Render results list
     function renderResults(tracks){
       searchResults.replaceChildren();
@@ -6445,16 +6451,16 @@
     }
 
     // ── Commands: non-owner sends, owner executes ──────────────────────────────
-    async function sendCommand(type, value = null) {
+    async function sendCommand(type, value = null, targetDevice = null) {
       if (!currentUser) return;
-      console.log('[CRT Connect] Attempting to send command:', type, value, 'current owner:', lastAudioOwner, 'my device:', deviceId);
+      console.log('[CRT Connect] Attempting to send command:', type, value, 'target:', targetDevice, 'current owner:', lastAudioOwner, 'my device:', deviceId);
       // Non-owners send commands; owners broadcast state directly
       if (lastAudioOwner === deviceId) {
         console.log('[CRT Connect] Not sending command - we are the owner');
         return;
       }
       const cmdRef = push(ref(db, `users/${currentUser}/commands`));
-      await set(cmdRef, { type, value, from: deviceId, at: Date.now() });
+      await set(cmdRef, { type, value, from: deviceId, targetDevice, at: Date.now() });
       console.log('[CRT Connect] Command sent successfully');
     }
 
@@ -6470,7 +6476,46 @@
         console.log('[CRT Connect] No owner exists, claiming ownership');
         lastAudioOwner = deviceId;
       }
-      // Only the current audio owner should execute commands
+      // PLAY command from another device: transfer ownership to that device
+      if (cmd.type === 'PLAY' && lastAudioOwner === deviceId && cmd.from !== deviceId) {
+        console.log('[CRT Connect] PLAY command from another device, transferring ownership to:', cmd.from);
+        // Transfer ownership to the requesting device (or specified target)
+        const targetDevice = cmd.targetDevice || cmd.from;
+        const audioEl = document.querySelector("audio");
+        const livePosition = audioEl && Number.isFinite(audioEl.currentTime) ? audioEl.currentTime : 0;
+        const livePlaying = audioEl ? !audioEl.paused : false;
+        const liveVolume = audioEl ? audioEl.volume : 1;
+        
+        // Get current state from Firebase
+        const snap = await get(ref(db, `users/${currentUser}/state`));
+        const existing = snap.exists() ? snap.val() : {};
+        
+        const state = {
+          trackId:    existing.trackId || null,
+          title:      existing.title   || null,
+          artist:     existing.artist  || null,
+          picUrl:     existing.picUrl  || null,
+          position:   livePosition,
+          playing:    true, // Always play when transferring via PLAY command
+          volume:     liveVolume,
+          audioOwner: targetDevice,
+          updatedBy:  deviceId,
+          updatedAt:  Date.now()
+        };
+        
+        // Pause ourselves
+        if (audioEl) audioEl.pause();
+        
+        // Write new state
+        await set(ref(db, `users/${currentUser}/state`), state);
+        lastAudioOwner = targetDevice;
+        
+        // Remove command
+        remove(ref(db, `users/${currentUser}/commands/${cmdId}`)).catch(() => {});
+        return;
+      }
+      
+      // Only the current audio owner should execute other commands
       if (lastAudioOwner !== deviceId) {
         console.log('[CRT Connect] Not the owner, ignoring command');
         return; // not our job
@@ -6620,6 +6665,14 @@
     async function transferAudioTo(targetDeviceId) {
       if (!currentUser) return;
       console.log('[CRT Connect] Transfer audio to:', targetDeviceId, 'from device:', deviceId, 'current owner:', lastAudioOwner);
+
+      // If we are NOT the current owner, send a PLAY command to the current owner
+      // to trigger the transfer from their side, specifying the target device
+      if (lastAudioOwner && lastAudioOwner !== deviceId) {
+        console.log('[CRT Connect] Not the owner, sending PLAY command to trigger transfer to:', targetDeviceId);
+        sendCommand("PLAY", null, targetDeviceId);
+        return;
+     }
 
       // Always read current playback state from Firebase so any device
       // can initiate a transfer, not just the one currently owning audio.
