@@ -1985,7 +1985,7 @@
       const deviceId = localStorage.getItem("crt_connect_device_id");
       const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
       const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
-      const isConnected = window.__crtConnect && lastAudioOwner !== null;
+      const isConnected = window.__crtConnect && window.__crtConnect.isLoggedIn() && lastAudioOwner !== null;
 
       if (isConnected && !isOwner) {
         // Send mute command to owner
@@ -2157,7 +2157,7 @@
         const deviceId = localStorage.getItem("crt_connect_device_id");
         const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
         const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
-        const isConnected = window.__crtConnect && lastAudioOwner !== null;
+        const isConnected = window.__crtConnect && window.__crtConnect.isLoggedIn() && lastAudioOwner !== null;
 
         // If connected and not owner, send command based on current UI state
         if (isConnected && !isOwner) {
@@ -2225,7 +2225,7 @@
       const deviceId = localStorage.getItem("crt_connect_device_id");
       const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
       const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
-      const isConnected = window.__crtConnect && lastAudioOwner !== null;
+      const isConnected = window.__crtConnect && window.__crtConnect.isLoggedIn() && lastAudioOwner !== null;
 
       if (isConnected && !isOwner) {
         // Send mute command to owner
@@ -2263,7 +2263,7 @@
       const deviceId = localStorage.getItem("crt_connect_device_id");
       const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
       const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
-      const isConnected = window.__crtConnect && lastAudioOwner !== null;
+      const isConnected = window.__crtConnect && window.__crtConnect.isLoggedIn() && lastAudioOwner !== null;
 
       if (isConnected && !isOwner) {
         // Send volume command to owner
@@ -2620,7 +2620,7 @@
         const deviceId = localStorage.getItem("crt_connect_device_id");
         const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
         const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
-        const isConnected = window.__crtConnect && lastAudioOwner !== null;
+        const isConnected = window.__crtConnect && window.__crtConnect.isLoggedIn() && lastAudioOwner !== null;
 
         if (isConnected && !isOwner) {
           if (window.__crtConnect && window.__crtConnect.sendCommand) {
@@ -2638,7 +2638,7 @@
         const deviceId = localStorage.getItem("crt_connect_device_id");
         const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
         const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
-        const isConnected = window.__crtConnect && lastAudioOwner !== null;
+        const isConnected = window.__crtConnect && window.__crtConnect.isLoggedIn() && lastAudioOwner !== null;
 
         if (isConnected && !isOwner) {
           if (window.__crtConnect && window.__crtConnect.sendCommand) {
@@ -3169,7 +3169,7 @@
       const deviceId = localStorage.getItem("crt_connect_device_id");
       const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
       const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
-      const isConnected = window.__crtConnect && lastAudioOwner !== null;
+      const isConnected = window.__crtConnect && window.__crtConnect.isLoggedIn() && lastAudioOwner !== null;
 
       if (isConnected && !isOwner) {
         if (window.__crtConnect && window.__crtConnect.sendCommand) {
@@ -3209,7 +3209,7 @@
       const deviceId = localStorage.getItem("crt_connect_device_id");
       const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
       const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
-      const isConnected = window.__crtConnect && lastAudioOwner !== null;
+      const isConnected = window.__crtConnect && window.__crtConnect.isLoggedIn() && lastAudioOwner !== null;
 
       if (isConnected && !isOwner) {
         if (window.__crtConnect && window.__crtConnect.sendCommand) {
@@ -3263,7 +3263,7 @@
       const deviceId = localStorage.getItem("crt_connect_device_id");
       const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
       const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
-      const isConnected = window.__crtConnect && lastAudioOwner !== null;
+      const isConnected = window.__crtConnect && window.__crtConnect.isLoggedIn() && lastAudioOwner !== null;
 
       if (isConnected && !isOwner) {
         // Send seek command to owner
@@ -3300,7 +3300,7 @@
       const deviceId = localStorage.getItem("crt_connect_device_id");
       const lastAudioOwner = window.__crtConnect ? window.__crtConnect.getAudioOwner() : null;
       const isOwner = !lastAudioOwner || lastAudioOwner === deviceId;
-      const isConnected = window.__crtConnect && lastAudioOwner !== null;
+      const isConnected = window.__crtConnect && window.__crtConnect.isLoggedIn() && lastAudioOwner !== null;
 
       if (isConnected && !isOwner) {
         // Send seek command to owner, calculate position from seek bar
@@ -6257,7 +6257,49 @@
       stopListeners();
       clearInterval(heartbeatTimer);
       currentUser = null;
+      lastAudioOwner = null;
+      if (window.__crtConnect) window.__crtConnect.setAudioOwner(null);
       localStorage.removeItem("crt_connect_user");
+
+      // Reset all UI that applyRemoteState may have populated
+      const pillTitle  = document.getElementById('pillTitle');
+      const pillArtist = document.getElementById('pillArtist');
+      const pillThumb  = document.getElementById('pillThumb');
+      if (pillTitle)  pillTitle.textContent  = 'happy visualizing';
+      if (pillArtist) pillArtist.textContent = 'CRT // AUDIO SCULPTURES';
+      if (pillThumb)  { pillThumb.src = ''; pillThumb.style.display = 'none'; }
+
+      const nowPlayingTitle  = document.getElementById('nowPlayingTitle');
+      const nowPlayingArtist = document.getElementById('nowPlayingArtist');
+      const nowPlayingThumb  = document.getElementById('nowPlayingThumb');
+      if (nowPlayingTitle)  nowPlayingTitle.textContent  = '—';
+      if (nowPlayingArtist) nowPlayingArtist.textContent = '—';
+      if (nowPlayingThumb)  nowPlayingThumb.classList.remove('visible');
+
+      const seekBar      = document.getElementById('seekBar');
+      const seekTime     = document.getElementById('seekTime');
+      const seekDuration = document.getElementById('seekDuration');
+      const pillSeekFill = document.getElementById('pillSeekFill');
+      const pillSeekScrub = document.getElementById('pillSeekScrub');
+      if (seekBar)      seekBar.value = 0;
+      if (seekTime)     seekTime.textContent = '0:00';
+      if (seekDuration) seekDuration.textContent = '0:00';
+      if (pillSeekFill) pillSeekFill.style.width = '0%';
+      if (pillSeekScrub) pillSeekScrub.value = 0;
+
+      const playIcon     = document.getElementById('playIcon');
+      const pauseIcon    = document.getElementById('pauseIcon');
+      const playIconCard = document.getElementById('playIconCard');
+      const pauseIconCard = document.getElementById('pauseIconCard');
+      if (playIcon)     playIcon.style.display  = '';
+      if (pauseIcon)    pauseIcon.style.display  = 'none';
+      if (playIconCard) playIconCard.style.display  = '';
+      if (pauseIconCard) pauseIconCard.style.display = 'none';
+
+      // Pause audio and clear queue if we were a non-owner client
+      const audioEl = document.querySelector('audio');
+      if (audioEl && !audioEl.paused) audioEl.pause();
+
       showLogin();
     }
 
@@ -6339,6 +6381,31 @@
       if (window.__crtConnect && window.__crtConnect.setAudioOwner) {
         window.__crtConnect.setAudioOwner(lastAudioOwner);
       }
+
+      // Ghost owner check: if the assigned owner is a different device and it's offline,
+      // claim ownership so this device can play instead of deferring to a ghost.
+      if (lastAudioOwner && lastAudioOwner !== deviceId) {
+        try {
+          const ownerSnap = await get(ref(db, `users/${currentUser}/devices/${lastAudioOwner}`));
+          const ownerData = ownerSnap.exists() ? ownerSnap.val() : null;
+          const ownerOnline = ownerData?.isOnline && (Date.now() - ownerData.lastSeen < 90_000);
+          if (!ownerOnline) {
+            console.log('[CRT Connect] Ghost owner detected:', lastAudioOwner, '— claiming ownership');
+            lastAudioOwner = deviceId;
+            if (window.__crtConnect) window.__crtConnect.setAudioOwner(deviceId);
+            await set(ref(db, `users/${currentUser}/state`), {
+              ...state,
+              audioOwner: deviceId,
+              updatedBy:  deviceId,
+              updatedAt:  Date.now()
+            });
+            return; // applyRemoteState will re-fire with us as owner
+          }
+        } catch (e) {
+          console.warn('[CRT Connect] Ghost owner check failed:', e);
+        }
+      }
+
       const weOwnAudio = state.audioOwner === deviceId;
       const justGotOwnership = weOwnAudio && prevOwner !== deviceId;
       console.log('[CRT Connect] Ownership check:', { weOwnAudio, justGotOwnership, prevOwner, newOwner: state.audioOwner });
@@ -6864,7 +6931,8 @@
       getAudioOwner: () => lastAudioOwner,
       setAudioOwner: (owner) => { lastAudioOwner = owner; },
       getDeviceId:   () => deviceId,
-      getDb: () => db
+      getDb:         () => db,
+      isLoggedIn:    () => !!currentUser,
     };
 
     // ── UI event listeners ────────────────────────────────────────────────────
