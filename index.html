@@ -6736,7 +6736,30 @@
       });
 
       const devRef = ref(db, `users/${currentUser}/devices`);
-      devicesListener = onValue(devRef, snap => renderDevices(snap.val() || {}));
+      devicesListener = onValue(devRef, snap => {
+        const devicesObj = snap.val() || {};
+        renderDevices(devicesObj);
+
+        // Auto-claim ownership if the current owner just went offline
+        if (!lastAudioOwner || lastAudioOwner === deviceId) return;
+        const ownerDev = devicesObj[lastAudioOwner];
+        const ownerOnline = ownerDev?.isOnline && (Date.now() - ownerDev.lastSeen < 90_000);
+        if (!ownerOnline) {
+          console.log('[CRT Connect] Owner went offline, auto-claiming ownership');
+          get(ref(db, `users/${currentUser}/state`)).then(stateSnap => {
+            const existing = stateSnap.exists() ? stateSnap.val() : {};
+            lastAudioOwner = deviceId;
+            if (window.__crtConnect) window.__crtConnect.setAudioOwner(deviceId);
+            return set(ref(db, `users/${currentUser}/state`), {
+              ...existing,
+              audioOwner: deviceId,
+              updatedBy:  deviceId,
+              updatedAt:  Date.now(),
+              playing:    false, // don't auto-play, let the user decide
+            });
+          }).catch(e => console.warn('[CRT Connect] Auto-claim failed:', e));
+        }
+      });
     }
 
     function stopListeners() {
