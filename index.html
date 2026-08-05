@@ -6858,6 +6858,7 @@
       const audioEl = document.querySelector("audio");
       audioEl?.addEventListener("play", () => {
         if (applyingRemote) return;
+        if (!currentUser) return; // not logged into Connect — play freely
         console.log('[CRT Connect] Audio play event, current owner:', lastAudioOwner, 'my device:', deviceId);
         // If we are the owner, broadcast state. If not, send command and prevent local playback.
         if (isOwner()) {
@@ -6871,6 +6872,7 @@
       });
       audioEl?.addEventListener("pause", () => {
         if (applyingRemote) return;
+        if (!currentUser) return; // not logged into Connect — pause freely
         console.log('[CRT Connect] Audio pause event, current owner:', lastAudioOwner, 'my device:', deviceId, 'autoPaused:', autoPaused);
         // Don't send command if this was an automatic pause from ownership loss
         if (autoPaused) {
