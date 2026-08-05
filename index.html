@@ -6372,8 +6372,9 @@
     async function applyRemoteState(state) {
       if (!state) return;
       console.log('[CRT Connect] Received state update:', { audioOwner: state.audioOwner, updatedBy: state.updatedBy, myDevice: deviceId, currentOwner: lastAudioOwner });
-      // Ignore our own non-transfer writes
+      // Ignore our own non-transfer writes (but allow auto-claim sentinel through)
       if (state.updatedBy === deviceId && state.audioOwner === deviceId) return;
+      if (state.updatedBy === '__auto_claim__' && state.audioOwner === deviceId) return; // we wrote this, skip
 
       const prevOwner  = lastAudioOwner;
       lastAudioOwner   = state.audioOwner;
@@ -6746,17 +6747,49 @@
         const ownerOnline = ownerDev?.isOnline && (Date.now() - ownerDev.lastSeen < 90_000);
         if (!ownerOnline) {
           console.log('[CRT Connect] Owner went offline, auto-claiming ownership');
-          get(ref(db, `users/${currentUser}/state`)).then(stateSnap => {
+          get(ref(db, `users/${currentUser}/state`)).then(async stateSnap => {
             const existing = stateSnap.exists() ? stateSnap.val() : {};
             lastAudioOwner = deviceId;
             if (window.__crtConnect) window.__crtConnect.setAudioOwner(deviceId);
-            return set(ref(db, `users/${currentUser}/state`), {
+
+            // Write claim to Firebase (use a sentinel updatedBy so applyRemoteState doesn't skip it)
+            await set(ref(db, `users/${currentUser}/state`), {
               ...existing,
               audioOwner: deviceId,
-              updatedBy:  deviceId,
+              updatedBy:  '__auto_claim__',
               updatedAt:  Date.now(),
-              playing:    false, // don't auto-play, let the user decide
+              playing:    false,
             });
+
+            // Load the track ourselves since applyRemoteState would skip our own write
+            if (existing.trackId && window.__crtPlayTrack) {
+              const track = {
+                id:     existing.trackId,
+                name:   existing.title  || '',
+                artist: existing.artist || '',
+                pic:    existing.picUrl || null,
+                album:  '',
+              };
+              console.log('[CRT Connect] Auto-claim: loading track', track.id);
+              window.__crtPlayTrack(track, { freshPick: false }).then(() => {
+                const audioEl = document.querySelector('audio');
+                if (audioEl) {
+                  const seekPos = existing.position || 0;
+                  function seekWhenReady() {
+                    if (Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
+                      audioEl.currentTime = seekPos;
+                      audioEl.pause(); // don't auto-play, let user decide
+                    } else {
+                      audioEl.addEventListener('loadedmetadata', () => {
+                        audioEl.currentTime = seekPos;
+                        audioEl.pause();
+                      }, { once: true });
+                    }
+                  }
+                  seekWhenReady();
+                }
+              }).catch(e => console.warn('[CRT Connect] Auto-claim track load failed:', e));
+            }
           }).catch(e => console.warn('[CRT Connect] Auto-claim failed:', e));
         }
       });
