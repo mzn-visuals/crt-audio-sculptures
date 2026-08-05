@@ -2808,7 +2808,7 @@
 
       // If connected and not the audio owner, redirect to host via LOAD command
       const crt = window.__crtConnect;
-      if (crt && crt.getAudioOwner && crt.getAudioOwner() && crt.getAudioOwner() !== crt.getDeviceId?.()) {
+      if (crt && crt.isLoggedIn?.() && crt.getAudioOwner && crt.getAudioOwner() && crt.getAudioOwner() !== crt.getDeviceId?.()) {
         console.log('[CRT Connect] Client queue play: sending LOAD command to host for track:', track.id);
         crt.sendCommand('LOAD', {
           id:       track.id,
@@ -3088,7 +3088,7 @@
     async function playStreamTrack(track, el, statusEl){
       // If connected and not the audio owner, redirect the play request to the host
       const crt = window.__crtConnect;
-      if (crt && crt.getAudioOwner && crt.getAudioOwner() && crt.getAudioOwner() !== crt.getDeviceId?.()) {
+      if (crt && crt.isLoggedIn?.() && crt.getAudioOwner && crt.getAudioOwner() && crt.getAudioOwner() !== crt.getDeviceId?.()) {
         console.log('[CRT Connect] Client search: sending LOAD command to host for track:', track.id);
         crt.sendCommand('LOAD', {
           id:     track.id,
