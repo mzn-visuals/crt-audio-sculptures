@@ -7157,33 +7157,21 @@
 
       log(msg) { console.log('[CRT Gesture]', msg); },
 
-      // ── Finger state helpers ───────────────────────────────────────────────
-      // Returns array of booleans [thumb, index, middle, ring, pinky] extended
+      // ── Finger state helpers ──────────────────────────────────────────────
       getFingersExtended(landmarks) {
         const tips   = [4,  8,  12, 16, 20];
         const middle = [3,  7,  11, 15, 19];
-        const base   = [2,  6,  10, 14, 18];
-        const wrist  = landmarks[0];
         const extended = [];
-
-        // Thumb: compare tip x vs base x (left/right flip depends on handedness — just use distance)
         const thumbExtended = Math.abs(landmarks[4].x - landmarks[2].x) > 0.05;
         extended.push(thumbExtended);
-
-        // Other fingers: tip y < pip y means extended (lower y = higher on screen)
         for (let i = 1; i < 5; i++) {
           extended.push(landmarks[tips[i]].y < landmarks[middle[i]].y);
         }
         return extended;
       },
 
-      countExtended(landmarks) {
-        return this.getFingersExtended(landmarks).filter(Boolean).length;
-      },
-
       isFist(landmarks) {
         const ext = this.getFingersExtended(landmarks);
-        // All four fingers curled, thumb may be in or out
         return !ext[1] && !ext[2] && !ext[3] && !ext[4];
       },
 
@@ -7192,34 +7180,98 @@
         return ext[1] && ext[2] && ext[3] && ext[4];
       },
 
-      // ── Rotation tracking (for volume) ────────────────────────────────────
-      rotationHistory: [],
+      // ── Play: index finger pointing straight UP, then z-push toward screen ──
+      // Index tip should be significantly above wrist in y, and roughly aligned x
+      // Then we detect a quick forward z movement (tip.z decreasing = toward camera)
+      isIndexPointingUp(landmarks) {
+        const wrist = landmarks[0];
+        const tip   = landmarks[8];  // index tip
+        const mcp   = landmarks[5];  // index base
+        const ext   = this.getFingersExtended(landmarks);
+        // Only index extended, others curled
+        if (!ext[1] || ext[2] || ext[3] || ext[4]) return false;
+        // Tip is well above wrist (y decreases upward in MediaPipe)
+        if (tip.y > wrist.y - 0.15) return false;
+        // Tip is roughly vertically aligned with base (not angled sideways)
+        if (Math.abs(tip.x - mcp.x) > 0.08) return false;
+        return true;
+      },
+
+      _playZHistory: [],
+      PLAY_Z_FRAMES: 6,
+      PLAY_Z_THRESHOLD: 0.06, // z decrease = moving toward camera
+
+      trackPlayTap(landmarks) {
+        if (!this.isIndexPointingUp(landmarks)) {
+          this._playZHistory = [];
+          return false;
+        }
+        const tip = landmarks[8];
+        this._playZHistory.push({ z: tip.z, t: Date.now() });
+        if (this._playZHistory.length > this.PLAY_Z_FRAMES) this._playZHistory.shift();
+        if (this._playZHistory.length < this.PLAY_Z_FRAMES) return false;
+        const dz = this._playZHistory[this._playZHistory.length - 1].z - this._playZHistory[0].z;
+        const dt = this._playZHistory[this._playZHistory.length - 1].t - this._playZHistory[0].t;
+        if (dt > 500 || dz > -this.PLAY_Z_THRESHOLD) return false;
+        this._playZHistory = [];
+        return true;
+      },
+
+      // ── Pause: halftime T sign — one hand vertical, other horizontal above it ─
+      // We need two hands. MediaPipe returns up to 2.
+      // Vertical hand: wrist.y significantly below middle finger tip (finger pointing up)
+      // Horizontal hand: wrist and middle finger tip roughly same y, spread x
+      isPauseSign(multiLandmarks) {
+        if (multiLandmarks.length < 2) return false;
+        const isVertical = (lm) => {
+          const wrist = lm[0]; const tip = lm[12];
+          return (wrist.y - tip.y) > 0.18 && Math.abs(tip.x - wrist.x) < 0.10;
+        };
+        const isHorizontal = (lm) => {
+          const wrist = lm[0]; const tip = lm[12];
+          return Math.abs(tip.y - wrist.y) < 0.08 && Math.abs(tip.x - wrist.x) > 0.15;
+        };
+        const [a, b] = multiLandmarks;
+        return (isVertical(a) && isHorizontal(b)) || (isVertical(b) && isHorizontal(a));
+      },
+
+      // ── Volume: index finger pointing straight at camera, then rotate ────────
+      // Index tip z should be significantly lower (closer) than wrist z
+      isIndexPointingAtCamera(landmarks) {
+        const ext = this.getFingersExtended(landmarks);
+        if (!ext[1] || ext[2] || ext[3] || ext[4]) return false;
+        const tip = landmarks[8];
+        const wrist = landmarks[0];
+        // Tip z < wrist z means tip is closer to camera (pointing at it)
+        // Also tip should be roughly level with wrist in y (not pointing up/down)
+        if (tip.z > wrist.z - 0.04) return false;
+        if (Math.abs(tip.y - wrist.y) > 0.12) return false;
+        return true;
+      },
+
       lastRotAngle: null,
       rotAccum: 0,
-      ROT_THRESHOLD: Math.PI * 1.2, // ~220 degrees to trigger
+      ROT_THRESHOLD: Math.PI * 1.1,
 
       trackRotation(landmarks) {
-        // Use index finger tip as the rotating point relative to wrist
+        if (!this.isIndexPointingAtCamera(landmarks)) {
+          this.resetRotation();
+          return null;
+        }
         const wrist = landmarks[0];
         const tip   = landmarks[8];
+        // Rotate around the z-axis using x/y of tip relative to wrist
         const angle = Math.atan2(tip.y - wrist.y, tip.x - wrist.x);
-
         if (this.lastRotAngle !== null) {
           let delta = angle - this.lastRotAngle;
-          // Wrap delta to [-π, π]
           if (delta > Math.PI)  delta -= 2 * Math.PI;
           if (delta < -Math.PI) delta += 2 * Math.PI;
           this.rotAccum += delta;
-
           if (this.rotAccum > this.ROT_THRESHOLD) {
-            this.rotAccum = 0;
-            this.lastRotAngle = angle;
-            return 'cw';
+            this.rotAccum = 0; this.lastRotAngle = angle; return 'cw';
           }
           if (this.rotAccum < -this.ROT_THRESHOLD) {
-            this.rotAccum = 0;
-            this.lastRotAngle = angle;
-            return 'ccw';
+            this.rotAccum = 0; this.lastRotAngle = angle; return 'ccw';
           }
         }
         this.lastRotAngle = angle;
@@ -7231,27 +7283,20 @@
         this.rotAccum = 0;
       },
 
-      // ── Swipe / pull-push tracking ─────────────────────────────────────────
+      // ── Swipe: open hand slap motion — fast lateral movement ─────────────────
       swipeHistory: [],
-      SWIPE_FRAMES: 8,
-      SWIPE_THRESHOLD: 0.18,  // normalized units (~18% of frame width)
-      PULL_THRESHOLD: 0.22,
-      PUSH_THRESHOLD: 0.22,
+      SWIPE_FRAMES: 7,
+      SWIPE_THRESHOLD: 0.20,
 
       trackSwipe(landmarks) {
         const wrist = landmarks[0];
-        this.swipeHistory.push({ x: wrist.x, y: wrist.y, t: Date.now() });
+        this.swipeHistory.push({ x: wrist.x, t: Date.now() });
         if (this.swipeHistory.length > this.SWIPE_FRAMES) this.swipeHistory.shift();
         if (this.swipeHistory.length < this.SWIPE_FRAMES) return null;
-
         const dx = this.swipeHistory[this.swipeHistory.length - 1].x - this.swipeHistory[0].x;
-        const dy = this.swipeHistory[this.swipeHistory.length - 1].y - this.swipeHistory[0].y;
         const dt = this.swipeHistory[this.swipeHistory.length - 1].t - this.swipeHistory[0].t;
-
-        // Fast enough and horizontal dominates
-        if (dt > 600) return null;
-        if (Math.abs(dx) < Math.abs(dy) * 1.5) return null;
-
+        // Must be fast (slap-like) and clearly horizontal
+        if (dt > 450) return null;
         if (dx > this.SWIPE_THRESHOLD)  { this.swipeHistory = []; return 'right'; }
         if (dx < -this.SWIPE_THRESHOLD) { this.swipeHistory = []; return 'left';  }
         return null;
@@ -7269,11 +7314,13 @@
         const audioEl = document.querySelector('audio');
 
         switch (gesture) {
-          case 'fist':
-            document.getElementById('playBtn')?.click() || audioEl?.pause();
+          case 'pause':
+            if (audioEl && !audioEl.paused) audioEl.pause();
+            else document.getElementById('playBtn')?.click();
             break;
-          case 'open_palm':
-            document.getElementById('playBtn')?.click() || audioEl?.play();
+          case 'play':
+            if (audioEl && audioEl.paused) audioEl.play();
+            else document.getElementById('playBtn')?.click();
             break;
           case 'vol_up': {
             const vol = document.getElementById('volumeSlider') || document.getElementById('volumeInput');
@@ -7329,14 +7376,14 @@
       // ── Feedback overlay ───────────────────────────────────────────────────
       showFeedback(gesture) {
         const labels = {
-          fist: '✊ Pause',
-          open_palm: '🖐 Play',
-          vol_up: '🔊 Volume +',
-          vol_down: '🔉 Volume −',
-          swipe_left: '⏮ Previous',
+          play:        '☝️ Play',
+          pause:       '🤚✋ Pause',
+          vol_up:      '🔊 Volume +',
+          vol_down:    '🔉 Volume −',
+          swipe_left:  '⏮ Previous',
           swipe_right: '⏭ Next',
-          pull: '↙ Take Playback',
-          push: '↗ Transfer Playback',
+          pull:        '↙ Take Playback',
+          push:        '↗ Transfer Playback',
         };
         let fb = document.getElementById('crt-gesture-feedback');
         if (!fb) {
@@ -7359,27 +7406,45 @@
       },
 
       // ── MediaPipe onResults ────────────────────────────────────────────────
-      // Track previous hand state for transition detection
+      // Track previous hand state for pull/push transitions
       _prevWasOpen: false,
       _prevWasFist: false,
+      _pauseHeld:   false,
 
       onResults(results) {
         if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
           this.resetRotation();
-          this.swipeHistory = [];
-          this._prevWasOpen = false;
-          this._prevWasFist = false;
-          this._fistHeld    = false;
-          this._palmHeld    = false;
+          this.swipeHistory  = [];
+          this._playZHistory = [];
+          this._prevWasOpen  = false;
+          this._prevWasFist  = false;
+          this._fistHeld     = false;
+          this._palmHeld     = false;
+          this._pauseHeld    = false;
           return;
         }
 
-        const landmarks = results.multiHandLandmarks[0];
+        const all       = results.multiHandLandmarks;
+        const landmarks = all[0];
         const fist = this.isFist(landmarks);
         const palm = this.isOpenPalm(landmarks);
 
-        // ── Pull: open → grab (fist/pinch) ──────────────────────────────────
-        // Transition: was open last frame, now closed
+        // ── Pause: T-sign with two hands ─────────────────────────────────────
+        if (this.isPauseSign(all)) {
+          if (!this._pauseHeld) { this._pauseHeld = true; this.trigger('pause'); }
+          this.resetRotation();
+          this.swipeHistory = [];
+          return;
+        }
+        this._pauseHeld = false;
+
+        // ── Play: index pointing up + z-tap toward screen ────────────────────
+        if (this.trackPlayTap(landmarks)) {
+          this.trigger('play');
+          return;
+        }
+
+        // ── Pull: open → grab ────────────────────────────────────────────────
         if (fist && this._prevWasOpen) {
           this._prevWasFist = true;
           this._prevWasOpen = false;
@@ -7389,8 +7454,7 @@
           return;
         }
 
-        // ── Push: grab → release (fist → open) ──────────────────────────────
-        // Transition: was fist last frame, now open
+        // ── Push: grab → release ─────────────────────────────────────────────
         if (palm && this._prevWasFist) {
           this._prevWasOpen = true;
           this._prevWasFist = false;
@@ -7400,45 +7464,28 @@
           return;
         }
 
-        // ── Pause: hold fist (not a grab transition) ─────────────────────────
-        if (fist) {
-          this.resetRotation();
-          if (!this._fistHeld) { this._fistHeld = true; this.trigger('fist'); }
-          this._prevWasFist = true;
-          this._prevWasOpen = false;
-          return;
-        }
-        this._fistHeld = false;
+        // Update pull/push state tracking
+        if (fist) { this._prevWasFist = true; this._prevWasOpen = false; }
+        else if (palm) { this._prevWasOpen = true; this._prevWasFist = false; }
+        else { this._prevWasOpen = false; this._prevWasFist = false; }
 
-        // ── Play: hold open palm (not a release transition) ──────────────────
-        if (palm) {
-          if (!this._palmHeld) { this._palmHeld = true; this.trigger('open_palm'); }
-          this._prevWasOpen = true;
-          this._prevWasFist = false;
-          this.resetRotation();
-          return;
-        }
-        this._palmHeld    = false;
-        this._prevWasOpen = false;
-        this._prevWasFist = false;
-
-        // ── Volume: only index finger extended → rotate ──────────────────────
-        const ext = this.getFingersExtended(landmarks);
-        const onlyIndex = ext[1] && !ext[2] && !ext[3] && !ext[4];
-
-        if (onlyIndex) {
+        // ── Volume: index pointing at camera, rotate ─────────────────────────
+        if (this.isIndexPointingAtCamera(landmarks)) {
           const rot = this.trackRotation(landmarks);
-          if (rot === 'cw')  { this.trigger('vol_up');  return; }
-          if (rot === 'ccw') { this.trigger('vol_down'); return; }
+          if (rot === 'cw')  { this.trigger('vol_up');   return; }
+          if (rot === 'ccw') { this.trigger('vol_down');  return; }
+          this.swipeHistory = [];
           return;
         }
         this.resetRotation();
 
-        // ── Swipe: hand moving laterally ─────────────────────────────────────
-        if (ext[1] && ext[2] && ext[3] && ext[4]) {
+        // ── Swipe: open hand fast lateral slap ───────────────────────────────
+        if (palm) {
           const swipe = this.trackSwipe(landmarks);
           if (swipe === 'left')  { this.trigger('swipe_left');  return; }
           if (swipe === 'right') { this.trigger('swipe_right'); return; }
+        } else {
+          this.swipeHistory = [];
         }
       },
 
@@ -7473,7 +7520,7 @@
           locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
         });
         this.hands.setOptions({
-          maxNumHands: 1,
+          maxNumHands: 2,
           modelComplexity: 0,
           minDetectionConfidence: 0.7,
           minTrackingConfidence: 0.6,
