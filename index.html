@@ -1649,6 +1649,7 @@
               </label>
 
               <div class="rowBtns" style="min-width:320px;">
+                <button id="gestureToggleBtn" type="button" class="secondary" title="Toggle gesture control">👁 Gestures</button>
                 <button id="randomize" type="button">Randomize</button>
                 <button id="reset" class="secondary" type="button">Reset</button>
               </div>
@@ -1744,7 +1745,6 @@
                       <span id="connectUsername" style="font-size:12px;font-family:ui-monospace,monospace;color:var(--text);"></span>
                     </div>
                     <button id="connectLogout" type="button" class="secondary" style="font-size:11px;padding:3px 10px;">Sign out</button>
-                    <button id="gestureToggleBtn" type="button" class="secondary" style="font-size:11px;padding:3px 10px;" title="Toggle gesture control">👁 Gestures</button>
                   </div>
 
                   <!-- Device name -->
@@ -7232,33 +7232,64 @@
         return ext[1] && !ext[2] && !ext[3] && ext[4];
       },
 
+      // ── Thumbs Up: thumb extended upward, other fingers curled ───────────────
+      isThumbsUp(landmarks) {
+        const ext = this.getFingersExtended(landmarks);
+        const wrist = landmarks[0];
+        const thumbTip = landmarks[4];
+        const thumbIP = landmarks[3];
+        // Thumb extended, others curled
+        if (!ext[0] || ext[1] || ext[2] || ext[3] || ext[4]) return false;
+        // Thumb tip should be above wrist (y decreases upward)
+        if (thumbTip.y > wrist.y - 0.10) return false;
+        // Thumb should be pointing upward, not sideways
+        if (Math.abs(thumbTip.x - thumbIP.x) > 0.08) return false;
+        return true;
+      },
+
+      // ── Thumbs Down: thumb extended downward, other fingers curled ─────────────
+      isThumbsDown(landmarks) {
+        const ext = this.getFingersExtended(landmarks);
+        const wrist = landmarks[0];
+        const thumbTip = landmarks[4];
+        const thumbIP = landmarks[3];
+        // Thumb extended, others curled
+        if (!ext[0] || ext[1] || ext[2] || ext[3] || ext[4]) return false;
+        // Thumb tip should be below wrist (y increases downward)
+        if (thumbTip.y < wrist.y + 0.10) return false;
+        // Thumb should be pointing downward, not sideways
+        if (Math.abs(thumbTip.x - thumbIP.x) > 0.08) return false;
+        return true;
+      },
+
       // ── Volume: index finger pointing at camera, then rotate ───────────────
-      // Fist-like shape with index extended toward camera (z-axis)
-      // Other fingers don't need to be fully curled — just index tip must be
-      // significantly closer to camera than wrist (lower z value)
+      // More lenient detection - just needs index extended and roughly pointing forward
       isIndexPointingAtCamera(landmarks) {
         const tip   = landmarks[8];  // index tip
-        const pip   = landmarks[6];  // index middle joint
         const wrist = landmarks[0];
         const mid12 = landmarks[12]; // middle finger tip
+        const ext   = this.getFingersExtended(landmarks);
 
-        // Index tip must be notably closer to camera than wrist
-        if (tip.z > wrist.z - 0.03) return false;
+        // Index must be extended
+        if (!ext[1]) return false;
 
-        // Index tip should be closer to camera than middle finger tip
-        // (rules out open palm facing camera)
-        if (tip.z > mid12.z) return false;
+        // Index tip should be somewhat closer to camera than middle finger tip
+        // (rules out open palm facing camera) - relaxed threshold
+        if (tip.z > mid12.z + 0.05) return false;
 
         // Tip should be roughly in front of wrist — not pointing wildly up/down
-        // Relaxed threshold so rotation doesn't break detection
-        if (Math.abs(tip.y - wrist.y) > 0.20) return false;
+        // Very relaxed threshold for easier detection
+        if (Math.abs(tip.y - wrist.y) > 0.35) return false;
+
+        // Tip should be roughly in front of wrist horizontally too
+        if (Math.abs(tip.x - wrist.x) > 0.35) return false;
 
         return true;
       },
 
       lastRotAngle: null,
       rotAccum: 0,
-      ROT_THRESHOLD: Math.PI * 1.1,
+      ROT_THRESHOLD: Math.PI * 0.8,  // Reduced threshold for easier triggering
 
       trackRotation(landmarks) {
         if (!this.isIndexPointingAtCamera(landmarks)) {
@@ -7355,20 +7386,26 @@
           case 'swipe_right':
             document.getElementById('nextBtn')?.click();
             break;
-
+          case 'thumbs_up':
+            document.getElementById('nextBtn')?.click();
+            break;
+          case 'thumbs_down':
+            document.getElementById('prevBtn')?.click();
+            break;
         }
       },
 
       // ── Feedback overlay ───────────────────────────────────────────────────
       showFeedback(gesture) {
         const labels = {
-          play:        '🤟 Play',
-          pause:       '✌️ Pause',
-          vol_up:      '🔊 Volume +',
-          vol_down:    '🔉 Volume −',
-          swipe_left:  '⏮ Previous',
-          swipe_right: '⏭ Next',
-
+          play:         '🤟 Play',
+          pause:        '✌️ Pause',
+          vol_up:       '🔊 Volume +',
+          vol_down:     '🔉 Volume −',
+          swipe_left:   '⏮ Previous',
+          swipe_right:  '⏭ Next',
+          thumbs_up:    '👍 Next Track',
+          thumbs_down:  '👎 Previous Track',
         };
         let fb = document.getElementById('crt-gesture-feedback');
         if (!fb) {
@@ -7394,6 +7431,8 @@
       // Track previous hand state for pull/push transitions
       _pauseHeld: false,
       _playHeld:  false,
+      _thumbsUpHeld: false,
+      _thumbsDownHeld: false,
 
       onResults(results) {
         if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
@@ -7404,6 +7443,8 @@
           this._palmHeld  = false;
           this._pauseHeld = false;
           this._playHeld  = false;
+          this._thumbsUpHeld = false;
+          this._thumbsDownHeld = false;
           return;
         }
 
@@ -7411,6 +7452,24 @@
         const landmarks = all[0];
         const fist = this.isFist(landmarks);
         const palm = this.isOpenPalm(landmarks);
+
+        // ── Thumbs Up: thumb extended upward, others curled ─────────────────
+        if (this.isThumbsUp(landmarks)) {
+          if (!this._thumbsUpHeld) { this._thumbsUpHeld = true; this.trigger('thumbs_up'); }
+          this.resetRotation();
+          this.swipeHistory = [];
+          return;
+        }
+        this._thumbsUpHeld = false;
+
+        // ── Thumbs Down: thumb extended downward, others curled ───────────────
+        if (this.isThumbsDown(landmarks)) {
+          if (!this._thumbsDownHeld) { this._thumbsDownHeld = true; this.trigger('thumbs_down'); }
+          this.resetRotation();
+          this.swipeHistory = [];
+          return;
+        }
+        this._thumbsDownHeld = false;
 
         // ── Pause: V / peace sign ────────────────────────────────────────────
         if (this.isPauseSign(all)) {
