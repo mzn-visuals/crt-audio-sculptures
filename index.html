@@ -1744,6 +1744,7 @@
                       <span id="connectUsername" style="font-size:12px;font-family:ui-monospace,monospace;color:var(--text);"></span>
                     </div>
                     <button id="connectLogout" type="button" class="secondary" style="font-size:11px;padding:3px 10px;">Sign out</button>
+                    <button id="gestureToggleBtn" type="button" class="secondary" style="font-size:11px;padding:3px 10px;" title="Toggle gesture control">👁 Gestures</button>
                   </div>
 
                   <!-- Device name -->
@@ -6187,6 +6188,18 @@
     const registerBtn    = document.getElementById("connectRegister");
     const loginError     = document.getElementById("connectLoginError");
     const logoutBtn      = document.getElementById("connectLogout");
+
+    // Gesture toggle
+    const gestureToggleBtn = document.getElementById('gestureToggleBtn');
+    if (gestureToggleBtn) {
+      gestureToggleBtn.addEventListener('click', () => {
+        const g = window.__crtGesture;
+        if (!g) return;
+        g.toggle();
+        gestureToggleBtn.textContent = g.active ? '\u{1F441} Gestures ON' : '\u{1F441} Gestures';
+        gestureToggleBtn.style.color = g.active ? 'var(--accent, #4caf50)' : '';
+      });
+    }
     const usernameLabel  = document.getElementById("connectUsername");
     const deviceNameInput= document.getElementById("connectDeviceName");
     const saveNameBtn    = document.getElementById("connectSaveName");
@@ -6849,6 +6862,17 @@
       noDevicesMsg.style.display = hasOthers ? "none" : "";
     }
 
+    // Expose for gesture control
+    window.__crtTransferAudioTo = (id) => transferAudioTo(id);
+    window.__crtOnlineDevices = () => {
+      const list = document.querySelectorAll('#deviceList [data-device-id]');
+      const result = [];
+      list.forEach(btn => {
+        result.push({ id: btn.dataset.deviceId, online: true });
+      });
+      return result;
+    };
+
     async function transferAudioTo(targetDeviceId) {
       if (!currentUser) return;
       console.log('[CRT Connect] Transfer audio to:', targetDeviceId, 'from device:', deviceId, 'current owner:', lastAudioOwner);
@@ -7108,5 +7132,392 @@
       });
     }
   </script>
+
+  <script>
+  // ── CRT Gesture Control ─────────────────────────────────────────────────────
+  // Uses front-facing camera + MediaPipe Hands to detect hand gestures
+  // Gestures: fist=pause, open-palm=play, clockwise=vol+, counter=vol-,
+  //           swipe-left=prev, swipe-right=next,
+  //           pull=take ownership, push=transfer ownership to next device
+  (function() {
+    const CRT_GESTURE = {
+      video: null,
+      canvas: null,
+      ctx: null,
+      hands: null,
+      camera: null,
+      active: false,
+      cooldown: false,
+      COOLDOWN_MS: 900,
+
+      // Gesture state tracking
+      lastPositions: [],   // ring buffer of {x,y,time} for velocity
+      pullPhase: false,    // true while tracking a pull gesture
+      pullStartX: null,
+
+      log(msg) { console.log('[CRT Gesture]', msg); },
+
+      // ── Finger state helpers ───────────────────────────────────────────────
+      // Returns array of booleans [thumb, index, middle, ring, pinky] extended
+      getFingersExtended(landmarks) {
+        const tips   = [4,  8,  12, 16, 20];
+        const middle = [3,  7,  11, 15, 19];
+        const base   = [2,  6,  10, 14, 18];
+        const wrist  = landmarks[0];
+        const extended = [];
+
+        // Thumb: compare tip x vs base x (left/right flip depends on handedness — just use distance)
+        const thumbExtended = Math.abs(landmarks[4].x - landmarks[2].x) > 0.05;
+        extended.push(thumbExtended);
+
+        // Other fingers: tip y < pip y means extended (lower y = higher on screen)
+        for (let i = 1; i < 5; i++) {
+          extended.push(landmarks[tips[i]].y < landmarks[middle[i]].y);
+        }
+        return extended;
+      },
+
+      countExtended(landmarks) {
+        return this.getFingersExtended(landmarks).filter(Boolean).length;
+      },
+
+      isFist(landmarks) {
+        const ext = this.getFingersExtended(landmarks);
+        // All four fingers curled, thumb may be in or out
+        return !ext[1] && !ext[2] && !ext[3] && !ext[4];
+      },
+
+      isOpenPalm(landmarks) {
+        const ext = this.getFingersExtended(landmarks);
+        return ext[1] && ext[2] && ext[3] && ext[4];
+      },
+
+      // ── Rotation tracking (for volume) ────────────────────────────────────
+      rotationHistory: [],
+      lastRotAngle: null,
+      rotAccum: 0,
+      ROT_THRESHOLD: Math.PI * 1.2, // ~220 degrees to trigger
+
+      trackRotation(landmarks) {
+        // Use index finger tip as the rotating point relative to wrist
+        const wrist = landmarks[0];
+        const tip   = landmarks[8];
+        const angle = Math.atan2(tip.y - wrist.y, tip.x - wrist.x);
+
+        if (this.lastRotAngle !== null) {
+          let delta = angle - this.lastRotAngle;
+          // Wrap delta to [-π, π]
+          if (delta > Math.PI)  delta -= 2 * Math.PI;
+          if (delta < -Math.PI) delta += 2 * Math.PI;
+          this.rotAccum += delta;
+
+          if (this.rotAccum > this.ROT_THRESHOLD) {
+            this.rotAccum = 0;
+            this.lastRotAngle = angle;
+            return 'cw';
+          }
+          if (this.rotAccum < -this.ROT_THRESHOLD) {
+            this.rotAccum = 0;
+            this.lastRotAngle = angle;
+            return 'ccw';
+          }
+        }
+        this.lastRotAngle = angle;
+        return null;
+      },
+
+      resetRotation() {
+        this.lastRotAngle = null;
+        this.rotAccum = 0;
+      },
+
+      // ── Swipe / pull-push tracking ─────────────────────────────────────────
+      swipeHistory: [],
+      SWIPE_FRAMES: 8,
+      SWIPE_THRESHOLD: 0.18,  // normalized units (~18% of frame width)
+      PULL_THRESHOLD: 0.22,
+      PUSH_THRESHOLD: 0.22,
+
+      trackSwipe(landmarks) {
+        const wrist = landmarks[0];
+        this.swipeHistory.push({ x: wrist.x, y: wrist.y, t: Date.now() });
+        if (this.swipeHistory.length > this.SWIPE_FRAMES) this.swipeHistory.shift();
+        if (this.swipeHistory.length < this.SWIPE_FRAMES) return null;
+
+        const dx = this.swipeHistory[this.swipeHistory.length - 1].x - this.swipeHistory[0].x;
+        const dy = this.swipeHistory[this.swipeHistory.length - 1].y - this.swipeHistory[0].y;
+        const dt = this.swipeHistory[this.swipeHistory.length - 1].t - this.swipeHistory[0].t;
+
+        // Fast enough and horizontal dominates
+        if (dt > 600) return null;
+        if (Math.abs(dx) < Math.abs(dy) * 1.5) return null;
+
+        if (dx > this.SWIPE_THRESHOLD)  { this.swipeHistory = []; return 'right'; }
+        if (dx < -this.SWIPE_THRESHOLD) { this.swipeHistory = []; return 'left';  }
+        return null;
+      },
+
+      // ── Trigger action ─────────────────────────────────────────────────────
+      trigger(gesture) {
+        if (this.cooldown) return;
+        this.cooldown = true;
+        setTimeout(() => { this.cooldown = false; }, this.COOLDOWN_MS);
+
+        this.log('Gesture: ' + gesture);
+        this.showFeedback(gesture);
+
+        const audioEl = document.querySelector('audio');
+
+        switch (gesture) {
+          case 'fist':
+            document.getElementById('playBtn')?.click() || audioEl?.pause();
+            break;
+          case 'open_palm':
+            document.getElementById('playBtn')?.click() || audioEl?.play();
+            break;
+          case 'vol_up': {
+            const vol = document.getElementById('volumeSlider') || document.getElementById('volumeInput');
+            if (vol) {
+              vol.value = Math.min(1, parseFloat(vol.value) + 0.1);
+              vol.dispatchEvent(new Event('input', { bubbles: true }));
+            } else if (audioEl) {
+              audioEl.volume = Math.min(1, audioEl.volume + 0.1);
+            }
+            break;
+          }
+          case 'vol_down': {
+            const vol = document.getElementById('volumeSlider') || document.getElementById('volumeInput');
+            if (vol) {
+              vol.value = Math.max(0, parseFloat(vol.value) - 0.1);
+              vol.dispatchEvent(new Event('input', { bubbles: true }));
+            } else if (audioEl) {
+              audioEl.volume = Math.max(0, audioEl.volume - 0.1);
+            }
+            break;
+          }
+          case 'swipe_left':
+            document.getElementById('prevBtn')?.click();
+            break;
+          case 'swipe_right':
+            document.getElementById('nextBtn')?.click();
+            break;
+          case 'pull': {
+            // Take ownership to this device
+            const crt = window.__crtConnect;
+            if (crt?.isLoggedIn?.()) {
+              const myId = crt.getDeviceId?.();
+              if (myId) window.__crtTransferAudioTo?.(myId);
+            }
+            break;
+          }
+          case 'push': {
+            // Transfer to the next online device in the list
+            const crt = window.__crtConnect;
+            if (crt?.isLoggedIn?.()) {
+              const devices = window.__crtOnlineDevices?.();
+              const myId = crt.getDeviceId?.();
+              if (devices && myId) {
+                const others = devices.filter(d => d.id !== myId && d.online);
+                if (others.length > 0) window.__crtTransferAudioTo?.(others[0].id);
+              }
+            }
+            break;
+          }
+        }
+      },
+
+      // ── Feedback overlay ───────────────────────────────────────────────────
+      showFeedback(gesture) {
+        const labels = {
+          fist: '✊ Pause',
+          open_palm: '🖐 Play',
+          vol_up: '🔊 Volume +',
+          vol_down: '🔉 Volume −',
+          swipe_left: '⏮ Previous',
+          swipe_right: '⏭ Next',
+          pull: '↙ Take Playback',
+          push: '↗ Transfer Playback',
+        };
+        let fb = document.getElementById('crt-gesture-feedback');
+        if (!fb) {
+          fb = document.createElement('div');
+          fb.id = 'crt-gesture-feedback';
+          fb.style.cssText = `
+            position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.75); color: #fff;
+            font-family: ui-monospace, monospace; font-size: 13px;
+            padding: 6px 16px; border-radius: 20px;
+            pointer-events: none; z-index: 99999;
+            transition: opacity 0.3s;
+          `;
+          document.body.appendChild(fb);
+        }
+        fb.textContent = labels[gesture] || gesture;
+        fb.style.opacity = '1';
+        clearTimeout(fb._t);
+        fb._t = setTimeout(() => { fb.style.opacity = '0'; }, 1400);
+      },
+
+      // ── MediaPipe onResults ────────────────────────────────────────────────
+      // Track previous hand state for transition detection
+      _prevWasOpen: false,
+      _prevWasFist: false,
+
+      onResults(results) {
+        if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+          this.resetRotation();
+          this.swipeHistory = [];
+          this._prevWasOpen = false;
+          this._prevWasFist = false;
+          this._fistHeld    = false;
+          this._palmHeld    = false;
+          return;
+        }
+
+        const landmarks = results.multiHandLandmarks[0];
+        const fist = this.isFist(landmarks);
+        const palm = this.isOpenPalm(landmarks);
+
+        // ── Pull: open → grab (fist/pinch) ──────────────────────────────────
+        // Transition: was open last frame, now closed
+        if (fist && this._prevWasOpen) {
+          this._prevWasFist = true;
+          this._prevWasOpen = false;
+          this._fistHeld    = true;
+          this.trigger('pull');
+          this.resetRotation();
+          return;
+        }
+
+        // ── Push: grab → release (fist → open) ──────────────────────────────
+        // Transition: was fist last frame, now open
+        if (palm && this._prevWasFist) {
+          this._prevWasOpen = true;
+          this._prevWasFist = false;
+          this._palmHeld    = false;
+          this.trigger('push');
+          this.resetRotation();
+          return;
+        }
+
+        // ── Pause: hold fist (not a grab transition) ─────────────────────────
+        if (fist) {
+          this.resetRotation();
+          if (!this._fistHeld) { this._fistHeld = true; this.trigger('fist'); }
+          this._prevWasFist = true;
+          this._prevWasOpen = false;
+          return;
+        }
+        this._fistHeld = false;
+
+        // ── Play: hold open palm (not a release transition) ──────────────────
+        if (palm) {
+          if (!this._palmHeld) { this._palmHeld = true; this.trigger('open_palm'); }
+          this._prevWasOpen = true;
+          this._prevWasFist = false;
+          this.resetRotation();
+          return;
+        }
+        this._palmHeld    = false;
+        this._prevWasOpen = false;
+        this._prevWasFist = false;
+
+        // ── Volume: only index finger extended → rotate ──────────────────────
+        const ext = this.getFingersExtended(landmarks);
+        const onlyIndex = ext[1] && !ext[2] && !ext[3] && !ext[4];
+
+        if (onlyIndex) {
+          const rot = this.trackRotation(landmarks);
+          if (rot === 'cw')  { this.trigger('vol_up');  return; }
+          if (rot === 'ccw') { this.trigger('vol_down'); return; }
+          return;
+        }
+        this.resetRotation();
+
+        // ── Swipe: hand moving laterally ─────────────────────────────────────
+        if (ext[1] && ext[2] && ext[3] && ext[4]) {
+          const swipe = this.trackSwipe(landmarks);
+          if (swipe === 'left')  { this.trigger('swipe_left');  return; }
+          if (swipe === 'right') { this.trigger('swipe_right'); return; }
+        }
+      },
+
+      // ── Init ──────────────────────────────────────────────────────────────
+      async init() {
+        this.log('Initializing...');
+
+        // Load MediaPipe Hands from CDN
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js';
+          s.crossOrigin = 'anonymous';
+          s.onload = resolve;
+          s.onerror = reject;
+          document.head.appendChild(s);
+        });
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js';
+          s.crossOrigin = 'anonymous';
+          s.onload = resolve;
+          s.onerror = reject;
+          document.head.appendChild(s);
+        });
+
+        this.video = document.createElement('video');
+        this.video.style.cssText = 'position:fixed;bottom:16px;right:16px;width:120px;height:90px;border-radius:8px;opacity:0.55;z-index:9999;object-fit:cover;transform:scaleX(-1);display:none;';
+        this.video.setAttribute('playsinline', '');
+        document.body.appendChild(this.video);
+
+        this.hands = new Hands({
+          locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+        });
+        this.hands.setOptions({
+          maxNumHands: 1,
+          modelComplexity: 0,
+          minDetectionConfidence: 0.7,
+          minTrackingConfidence: 0.6,
+        });
+        this.hands.onResults(r => this.onResults(r));
+
+        this.camera = new Camera(this.video, {
+          onFrame: async () => {
+            if (this.active) await this.hands.send({ image: this.video });
+          },
+          width: 320,
+          height: 240,
+          facingMode: 'user',
+        });
+
+        this.log('Ready');
+      },
+
+      async start() {
+        if (this.active) return;
+        if (!this.hands) await this.init();
+        this.active = true;
+        this.video.style.display = 'block';
+        await this.camera.start();
+        this.log('Started');
+        this.showFeedback('👁 Gesture Control On');
+      },
+
+      stop() {
+        if (!this.active) return;
+        this.active = false;
+        this.video.style.display = 'none';
+        this.camera?.stop();
+        this.log('Stopped');
+      },
+
+      toggle() {
+        this.active ? this.stop() : this.start();
+      },
+    };
+
+    window.__crtGesture = CRT_GESTURE;
+  })();
+  </script>
+
 </body>
 </html>
