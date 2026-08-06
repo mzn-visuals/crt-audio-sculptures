@@ -7217,35 +7217,42 @@
         return true;
       },
 
-      // ── Pause: halftime T sign — one hand vertical, other horizontal above it ─
-      // We need two hands. MediaPipe returns up to 2.
-      // Vertical hand: wrist.y significantly below middle finger tip (finger pointing up)
-      // Horizontal hand: wrist and middle finger tip roughly same y, spread x
+      // ── Pause: V / peace sign — index + middle extended, others curled ────────
       isPauseSign(multiLandmarks) {
-        if (multiLandmarks.length < 2) return false;
-        const isVertical = (lm) => {
-          const wrist = lm[0]; const tip = lm[12];
-          return (wrist.y - tip.y) > 0.18 && Math.abs(tip.x - wrist.x) < 0.10;
-        };
-        const isHorizontal = (lm) => {
-          const wrist = lm[0]; const tip = lm[12];
-          return Math.abs(tip.y - wrist.y) < 0.08 && Math.abs(tip.x - wrist.x) > 0.15;
-        };
-        const [a, b] = multiLandmarks;
-        return (isVertical(a) && isHorizontal(b)) || (isVertical(b) && isHorizontal(a));
+        const lm  = multiLandmarks[0];
+        const ext = this.getFingersExtended(lm);
+        // Index and middle extended, ring and pinky curled
+        return ext[1] && ext[2] && !ext[3] && !ext[4];
       },
 
-      // ── Volume: index finger pointing straight at camera, then rotate ────────
-      // Index tip z should be significantly lower (closer) than wrist z
-      isIndexPointingAtCamera(landmarks) {
+      // ── Play: rock/punk sign 🤟 — index + pinky extended, middle + ring curled ─
+      isPlaySign(landmarks) {
         const ext = this.getFingersExtended(landmarks);
-        if (!ext[1] || ext[2] || ext[3] || ext[4]) return false;
-        const tip = landmarks[8];
+        // Index and pinky extended, middle and ring curled
+        return ext[1] && !ext[2] && !ext[3] && ext[4];
+      },
+
+      // ── Volume: index finger pointing at camera, then rotate ───────────────
+      // Fist-like shape with index extended toward camera (z-axis)
+      // Other fingers don't need to be fully curled — just index tip must be
+      // significantly closer to camera than wrist (lower z value)
+      isIndexPointingAtCamera(landmarks) {
+        const tip   = landmarks[8];  // index tip
+        const pip   = landmarks[6];  // index middle joint
         const wrist = landmarks[0];
-        // Tip z < wrist z means tip is closer to camera (pointing at it)
-        // Also tip should be roughly level with wrist in y (not pointing up/down)
-        if (tip.z > wrist.z - 0.04) return false;
-        if (Math.abs(tip.y - wrist.y) > 0.12) return false;
+        const mid12 = landmarks[12]; // middle finger tip
+
+        // Index tip must be notably closer to camera than wrist
+        if (tip.z > wrist.z - 0.03) return false;
+
+        // Index tip should be closer to camera than middle finger tip
+        // (rules out open palm facing camera)
+        if (tip.z > mid12.z) return false;
+
+        // Tip should be roughly in front of wrist — not pointing wildly up/down
+        // Relaxed threshold so rotation doesn't break detection
+        if (Math.abs(tip.y - wrist.y) > 0.20) return false;
+
         return true;
       },
 
@@ -7348,42 +7355,20 @@
           case 'swipe_right':
             document.getElementById('nextBtn')?.click();
             break;
-          case 'pull': {
-            // Take ownership to this device
-            const crt = window.__crtConnect;
-            if (crt?.isLoggedIn?.()) {
-              const myId = crt.getDeviceId?.();
-              if (myId) window.__crtTransferAudioTo?.(myId);
-            }
-            break;
-          }
-          case 'push': {
-            // Transfer to the next online device in the list
-            const crt = window.__crtConnect;
-            if (crt?.isLoggedIn?.()) {
-              const devices = window.__crtOnlineDevices?.();
-              const myId = crt.getDeviceId?.();
-              if (devices && myId) {
-                const others = devices.filter(d => d.id !== myId && d.online);
-                if (others.length > 0) window.__crtTransferAudioTo?.(others[0].id);
-              }
-            }
-            break;
-          }
+
         }
       },
 
       // ── Feedback overlay ───────────────────────────────────────────────────
       showFeedback(gesture) {
         const labels = {
-          play:        '☝️ Play',
-          pause:       '🤚✋ Pause',
+          play:        '🤟 Play',
+          pause:       '✌️ Pause',
           vol_up:      '🔊 Volume +',
           vol_down:    '🔉 Volume −',
           swipe_left:  '⏮ Previous',
           swipe_right: '⏭ Next',
-          pull:        '↙ Take Playback',
-          push:        '↗ Transfer Playback',
+
         };
         let fb = document.getElementById('crt-gesture-feedback');
         if (!fb) {
@@ -7407,20 +7392,18 @@
 
       // ── MediaPipe onResults ────────────────────────────────────────────────
       // Track previous hand state for pull/push transitions
-      _prevWasOpen: false,
-      _prevWasFist: false,
-      _pauseHeld:   false,
+      _pauseHeld: false,
+      _playHeld:  false,
 
       onResults(results) {
         if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
           this.resetRotation();
           this.swipeHistory  = [];
           this._playZHistory = [];
-          this._prevWasOpen  = false;
-          this._prevWasFist  = false;
-          this._fistHeld     = false;
-          this._palmHeld     = false;
-          this._pauseHeld    = false;
+          this._fistHeld  = false;
+          this._palmHeld  = false;
+          this._pauseHeld = false;
+          this._playHeld  = false;
           return;
         }
 
@@ -7429,7 +7412,7 @@
         const fist = this.isFist(landmarks);
         const palm = this.isOpenPalm(landmarks);
 
-        // ── Pause: T-sign with two hands ─────────────────────────────────────
+        // ── Pause: V / peace sign ────────────────────────────────────────────
         if (this.isPauseSign(all)) {
           if (!this._pauseHeld) { this._pauseHeld = true; this.trigger('pause'); }
           this.resetRotation();
@@ -7438,36 +7421,14 @@
         }
         this._pauseHeld = false;
 
-        // ── Play: index pointing up + z-tap toward screen ────────────────────
-        if (this.trackPlayTap(landmarks)) {
-          this.trigger('play');
-          return;
-        }
-
-        // ── Pull: open → grab ────────────────────────────────────────────────
-        if (fist && this._prevWasOpen) {
-          this._prevWasFist = true;
-          this._prevWasOpen = false;
-          this._fistHeld    = true;
-          this.trigger('pull');
+        // ── Play: rock / punk sign 🤟 ────────────────────────────────────────
+        if (this.isPlaySign(landmarks)) {
+          if (!this._playHeld) { this._playHeld = true; this.trigger('play'); }
           this.resetRotation();
+          this.swipeHistory = [];
           return;
         }
-
-        // ── Push: grab → release ─────────────────────────────────────────────
-        if (palm && this._prevWasFist) {
-          this._prevWasOpen = true;
-          this._prevWasFist = false;
-          this._palmHeld    = false;
-          this.trigger('push');
-          this.resetRotation();
-          return;
-        }
-
-        // Update pull/push state tracking
-        if (fist) { this._prevWasFist = true; this._prevWasOpen = false; }
-        else if (palm) { this._prevWasOpen = true; this._prevWasFist = false; }
-        else { this._prevWasOpen = false; this._prevWasFist = false; }
+        this._playHeld = false;
 
         // ── Volume: index pointing at camera, rotate ─────────────────────────
         if (this.isIndexPointingAtCamera(landmarks)) {
@@ -7520,7 +7481,7 @@
           locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
         });
         this.hands.setOptions({
-          maxNumHands: 2,
+          maxNumHands: 1,
           modelComplexity: 0,
           minDetectionConfidence: 0.7,
           minTrackingConfidence: 0.6,
